@@ -31,6 +31,6 @@ either statically set for pegged tokens, or dynamically updated for conversions
 between two different cryptos/tokens.
 
 .. _Privex Inc.: https://www.privex.io
-.. _Github: https://github.org/Privex/cryptotoken-converter
+.. _Github: https://github.com/Privex/cryptotoken-converter
 .. _Steem: https://steem.com
 .. _Steem Engine: https://steem-engine.com

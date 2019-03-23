@@ -45,7 +45,8 @@ Install Core Dependencies
 
 For this guide, we'll be using PostgreSQL, but you're free to use MySQL if you're more comfortable with it.
 
-Using your system package manager, install Python 3.7, Postgres server, nginx, and git
+Using your system package manager, install Python 3.7, Postgres server, nginx, git, along with some various
+important libraries needed for our Python packages.
 
 .. code-block:: bash
 
@@ -53,12 +54,14 @@ Using your system package manager, install Python 3.7, Postgres server, nginx, a
     # Install Python 3.7, Nginx, and Git
     sudo apt install -y python3.7 python3.7-dev python3.7-venv nginx git
 
-    # (If you want to use PostgreSQL)
+    # Install libssl-dev for the OpenSSL headers (required for the Beem python library)
+    # and build-essential - various tools required for building and compiling the python dependencies
+    sudo apt install -y build-essential libssl-dev
+
     # The `postgresql` package will install the latest Postgres client and server, we also want libpq-dev,
     # which is the postgres client dev headers, sometimes needed for Python postgres libraries
     sudo apt install -y postgresql libpq-dev
 
-    # (If you want to use MariaDB / MySQL)
     # Install MariaDB (cross-compatible with MySQL) and the development headers to avoid issues with the Python
     # MySQL library
     sudo apt install -y mariadb-server libmariadbclient-dev libmariadb-dev
