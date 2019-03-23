@@ -1,0 +1,52 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+    <meta charset="utf-8"/>
+    <title>{% block title %}SteemEngine Payments{% endblock %}</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.4.1/semantic.min.css"/>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.4.1/semantic.min.js"></script>
+    <style>
+        body{
+            background: #111a3c;
+        }
+        #mainbox {
+            min-height: 600px;
+            margin-top: 20px;
+            padding: 3em;
+        }
+        #logo {
+            text-align: center;
+            -webkit-filter: invert(1);
+            filter: invert(1);
+        }
+        #privexfooter {
+            margin-bottom: 2rem;
+            padding: 1rem 1rem 3rem;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Your Semantic UI Code -->
+<div class="ui container">
+
+
+{#    <div class="ui raised segment" id="mainbox">#}
+{#        {% block content %}{% endblock %}#}
+{#    </div>#}
+
+    <div class="ui raised segment" id="privexfooter">
+        <h3>This Web API is running <a href="https://github.com/Privex/cryptotoken-converter" target="_blank">CryptoToken Converter</a>,
+        an open source application created by <a href="https://www.privex.io/" target="_blank">Privex Inc.</a></h3>
+        <h3>Privex Inc. DOES NOT operate this service, and is not liable for any damages caused by using it.
+        If you have any problems with this service, please contact the owner of this domain: <h2>{{ request.get_host }}</h2></h3>
+        <a href="https://www.privex.io/" target="_blank">
+            <img src="/static/assets/svg/privex_dev.svg" alt="Developed by Privex"/>
+        </a>
+    </div>
+
+</div>
+
+</body>
+</html>
