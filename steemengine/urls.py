@@ -22,10 +22,10 @@ Copyright::
 """
 # from adminplus.sites import AdminSitePlus
 from django.contrib import admin
-from django.urls import path, include
+from django.urls import path, include, re_path
 from rest_framework import routers
 
-from payments.views import IndexView, DepositAPI, CoinAPI, ConvertAPI, CoinPairAPI, ConversionAPI
+from payments.views import IndexView, DepositAPI, CoinAPI, ConvertAPI, CoinPairAPI, ConversionAPI, api_root
 from payments.admin import ctadmin
 
 
@@ -42,9 +42,10 @@ admin.autodiscover()
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/convert/', ConvertAPI.as_view()),
+    path('api/convert/', ConvertAPI.as_view(), name='start_convert'),
+    re_path(r'^api/$', api_root),
     path('api/', include(router.urls)),
-    path('', IndexView.as_view())
+    path('', IndexView.as_view(), name='index')
 ]
 
 

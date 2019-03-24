@@ -1,0 +1,32 @@
+{% extends "rest_framework/base.html" %}
+
+{% block branding %}
+<a class="navbar-brand" rel="nofollow" href="{% url 'index' %}">
+    CryptoToken Converter REST API
+</a>
+{% endblock %}
+
+{% block content %}
+    {{ block.super }}
+    <div class="text-center" style="margin-top: 10%">
+        <hr/>
+        <p style="color: #a5a5a5; font-size: 14px;">
+            This Web API is running <a href="https://github.com/Privex/cryptotoken-converter" target="_blank">CryptoToken
+            Converter</a>, an open source application created by
+            <a href="https://www.privex.io/" target="_blank">Privex Inc.</a>
+            <br/>
+
+            <strong>Privex Inc. DOES NOT operate this service, and is not liable for any damages caused
+                by using it.</strong>
+            <br/>
+
+            If you have any problems with this service, please contact the owner of this domain:
+            <strong>{{ request.get_host }}</strong>
+        </p>
+        <a href="https://www.privex.io/" target="_blank">
+            <img src="https://www.privex.io/static/assets/svg/privex_ctc_api.svg"
+                 alt="Developed by Privex" width="50%"/>
+        </a>
+        <br/><br/>
+    </div>
+{% endblock %}

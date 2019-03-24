@@ -1,7 +1,9 @@
 import logging
 from rest_framework import viewsets
+from rest_framework.decorators import api_view
 from rest_framework.request import Request
 from rest_framework.response import Response
+from rest_framework.reverse import reverse
 from rest_framework.views import APIView
 
 from payments.coin_handlers import get_manager
@@ -31,6 +33,17 @@ log = logging.getLogger(__name__)
 
 class IndexView(TemplateView):
     template_name = 'base.html'
+
+
+@api_view(['GET'])
+def api_root(request, format=None):
+    return Response({
+        'coins': reverse('coin-list', request=request, format=format),
+        'pairs': reverse('coinpair-list', request=request, format=format),
+        'deposits': reverse('deposit-list', request=request, format=format),
+        'conversions': reverse('conversion-list', request=request, format=format),
+        'start_conversion': reverse('start_convert', request=request, format=format)
+    })
 
 
 class CoinAPI(viewsets.ReadOnlyModelViewSet):
