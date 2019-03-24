@@ -34,7 +34,7 @@ class IndexView(TemplateView):
 
 
 class CoinAPI(viewsets.ReadOnlyModelViewSet):
-    queryset = Coin.objects.all()
+    queryset = Coin.objects.filter(enabled=True)
     serializer_class = CoinSerializer
 
 
@@ -45,7 +45,7 @@ class DepositAPI(viewsets.ReadOnlyModelViewSet):
 
 
 class CoinPairAPI(viewsets.ReadOnlyModelViewSet):
-    queryset = CoinPair.objects.all()
+    queryset = CoinPair.objects.filter(from_coin__enabled=True, to_coin__enabled=True)
     serializer_class = CoinPairSerializer
     filterset_fields = ('from_coin', 'to_coin')
 

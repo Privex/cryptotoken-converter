@@ -128,6 +128,14 @@ class CoinPair(models.Model):
     exchange_rate = models.DecimalField('Exchange Rate (Amount of `to` per `from`)', max_digits=MAX_STORED_DIGITS,
                                         decimal_places=MAX_STORED_DP, default=1)
 
+    @property
+    def from_coin_symbol(self):
+        return self.from_coin.symbol
+
+    @property
+    def to_coin_symbol(self):
+        return self.to_coin.symbol
+
     def __str__(self):
         return '{c_from} -> {c_to} ({ex:.4f} {c_to} per {c_from})'.format(
             c_from=self.from_coin.symbol, c_to=self.to_coin.symbol, ex=self.exchange_rate

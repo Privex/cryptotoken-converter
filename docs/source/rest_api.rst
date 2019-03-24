@@ -435,15 +435,19 @@ Note: Results from ``/api/pairs/`` will always be returned as a list, even if th
     [
         {
             "id": 1,
-            "from_coin": "LTC",
-            "to_coin": "SGTK",
+            "from_coin": "http://127.0.0.1:8000/api/coins/LTC/",
+            "from_coin_symbol": "LTC",
+            "to_coin": "http://127.0.0.1:8000/api/coins/SGTK/",
+            "to_coin_symbol": "SGTK",
             "exchange_rate": "100000.00000000000000000000",
             "__str__": "LTC -> SGTK (100000.0000 SGTK per LTC)"
         },
         {
             "id": 2,
-            "from_coin": "SGTK",
-            "to_coin": "LTC",
+            "from_coin": "http://127.0.0.1:8000/api/coins/SGTK/",
+            "from_coin_symbol": "SGTK",
+            "to_coin": "http://127.0.0.1:8000/api/coins/LTC/",
+            "to_coin_symbol": "LTC",
             "exchange_rate": "0.01000000000000000000",
             "__str__": "SGTK -> LTC (0.0100 LTC per SGTK)"
         }
@@ -459,8 +463,10 @@ Note: Results from ``/api/pairs/`` will always be returned as a list, even if th
     [
         {
             "id": 1,
-            "from_coin": "LTC",
-            "to_coin": "SGTK",
+            "from_coin": "http://127.0.0.1:8000/api/coins/LTC/",
+            "from_coin_symbol": "LTC",
+            "to_coin": "http://127.0.0.1:8000/api/coins/SGTK/",
+            "to_coin_symbol": "SGTK",
             "exchange_rate": "100000.00000000000000000000",
             "__str__": "LTC -> SGTK (100000.0000 SGTK per LTC)"
         }
@@ -477,8 +483,10 @@ Note: Results from ``/api/pairs/`` will always be returned as a list, even if th
 
     {
         "id": 1,
-        "from_coin": "LTC",
-        "to_coin": "SGTK",
+        "from_coin": "http://127.0.0.1:8000/api/coins/LTC/",
+        "from_coin_symbol": "LTC",
+        "to_coin": "http://127.0.0.1:8000/api/coins/SGTK/",
+        "to_coin_symbol": "SGTK",
         "exchange_rate": "100000.00000000000000000000",
         "__str__": "LTC -> SGTK (100000.0000 SGTK per LTC)"
     }

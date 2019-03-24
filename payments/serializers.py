@@ -29,11 +29,21 @@ class DepositSerializer(serializers.HyperlinkedModelSerializer):
         )
 
 
-class CoinPairSerializer(serializers.ModelSerializer):
+class CoinPairSerializer(serializers.HyperlinkedModelSerializer):
+    from_coin_symbol = serializers.ReadOnlyField()
+    to_coin_symbol = serializers.ReadOnlyField()
 
     class Meta:
         model = CoinPair
-        fields = ('id', 'from_coin', 'to_coin', 'exchange_rate', '__str__')
+        fields = (
+            'id',
+            'from_coin',
+            'from_coin_symbol',
+            'to_coin',
+            'to_coin_symbol',
+            'exchange_rate',
+            '__str__'
+        )
 
 
 class ConversionSerializer(serializers.HyperlinkedModelSerializer):
