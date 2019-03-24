@@ -78,6 +78,12 @@ REST_FRAMEWORK = {
     'DEFAULT_FILTER_BACKENDS': ('django_filters.rest_framework.DjangoFilterBackend',)
 }
 
+# Ignore the whitelist and allow CORS from anywhere
+CORS_ORIGIN_ALLOW_ALL = env('CORS_ORIGIN_ALLOW_ALL', True) in [True, 'true', 'True', 'TRUE', 1]
+# A comma separated list of domains (must include each subdomain) that can send CORS requests
+# This is ignored if you don't change CORS_ORIGIN_ALLOW_ALL to False.
+CORS_ORIGIN_WHITELIST = env('CORS_ORIGIN_WHITELIST', '').split(',')
+
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env('DEBUG', False) in [True, 'true', 'True', 'TRUE', 1]
 
@@ -138,6 +144,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'corsheaders',
     'rest_framework',
     'django_filters',
     'payments',
@@ -146,6 +153,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
