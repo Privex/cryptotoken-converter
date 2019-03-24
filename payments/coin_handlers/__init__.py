@@ -136,6 +136,19 @@ def get_loaders(symbol: str = None) -> list:
     return [(s, data['loaders'],) for s, data in handlers] if symbol is None else handlers[symbol]['loaders']
 
 
+def has_manager(symbol: str) -> bool:
+    """Helper function - does this symbol have a manager class?"""
+
+    if not handlers_loaded: reload_handlers()
+    return symbol.upper() in handlers and len(handlers[symbol].get('managers', [])) > 0
+
+
+def has_loader(symbol: str) -> bool:
+    """Helper function - does this symbol have a loader class?"""
+    if not handlers_loaded: reload_handlers()
+    return symbol.upper() in handlers and len(handlers.get('loaders', [])) > 0
+
+
 def get_managers(symbol: str = None) -> list:
     """
     Get all manager's, or all manager's for a certain coin

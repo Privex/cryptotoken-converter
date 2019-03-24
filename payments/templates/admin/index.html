@@ -1,0 +1,18 @@
+{% extends "admin/index.html" %}
+
+{% block sidebar %}
+    {{ block.super }}
+    <div id="content-main">
+        <div class="module">
+            <table style="width: 100%">
+                <caption>
+                    <span class="section">Custom Pages</span>
+                </caption>
+                <tr class="model-{{ model.object_name|lower }}">
+                    <th scope="row"><a href="{% url 'admin:coin_health' %}">Coin Handler Status/Health</a></th>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+{% endblock %}

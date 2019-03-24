@@ -1,0 +1,66 @@
+{% extends "admin/base_site.html" %}
+{% load i18n cache static %}
+
+{% block extrastyle %}
+    {{ block.super }}
+    <link rel="stylesheet" type="text/css" href="{% static "admin/css/forms.css" %}">
+{% endblock %}
+
+{% block breadcrumbs %}
+    <div class="breadcrumbs">
+        <a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
+        &rsaquo; <a
+            href="">Coin Handler Health</a>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <h1>Coin Health Status Page</h1>
+    <p><strong>Note on caching:</strong> To avoid constantly polling RPC nodes, this page may be cached for
+    up to 30 seconds. There's a button at the bottom of the page to clear the cache if you need live data.</p>
+    <p>Below is a list of Coin Handler's, and the status of each coin they support:</p>
+    {% cache 10 coin_health_tpl %}
+        {% for handler, health in view.handler_dic.items %}
+            <h2>{{ handler }}</h2>
+            <table>
+                <thead>
+                    <tr>
+                        {% for h in health.headings %}
+                            <th>{{ h }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in health.results %}
+                        <tr>
+                            {% for r in row %}
+                                <td>{{ r|safe }}</td>
+                            {% endfor %}
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <br/>
+            <hr/>
+            <br/>
+        {% endfor %}
+        {% if view.get_fails %}
+            <h3>The following coins could not be checked:</h3>
+            <ul>
+                {% for err in view.get_fails %}
+                    <li>{{ err }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+    {% endcache %}
+
+    <form action="{% url 'admin:clear_cache' %}" method="POST"
+          onsubmit="return confirm('Warning: This will clear the cache for the entire application! Do you want to continue?')"
+        >
+        {% csrf_token %}
+        <div class="submit-row" style="text-align: left">
+            <input type="submit" name="clear" value="Clear Django Cache"/>
+        </div>
+    </form>
+
+{% endblock %}

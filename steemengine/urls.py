@@ -20,12 +20,14 @@ Copyright::
     +===================================================+
 
 """
-
+# from adminplus.sites import AdminSitePlus
 from django.contrib import admin
 from django.urls import path, include
 from rest_framework import routers
 
 from payments.views import IndexView, DepositAPI, CoinAPI, ConvertAPI, CoinPairAPI, ConversionAPI
+from payments.admin import ctadmin
+
 
 router = routers.SimpleRouter()
 
@@ -33,6 +35,10 @@ router.register(r'deposits', DepositAPI)
 router.register(r'coins', CoinAPI)
 router.register(r'pairs', CoinPairAPI)
 router.register(r'conversions', ConversionAPI)
+
+admin.site = ctadmin
+admin.sites.site = admin.site
+admin.autodiscover()
 
 urlpatterns = [
     path('admin/', admin.site.urls),

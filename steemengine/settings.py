@@ -55,70 +55,63 @@ if SECRET_KEY is None:
 
 # Supply a list of one or more comma-separated Steem RPC nodes. If not set, will use the default beem nodes.
 STEEM_RPC_NODES = env('STEEM_RPC_NODES', None)
-
-if STEEM_RPC_NODES is not None:
-    STEEM_RPC_NODES = STEEM_RPC_NODES.split(',')
-
+STEEM_RPC_NODES = STEEM_RPC_NODES.split(',') if STEEM_RPC_NODES is not None else None
+# Set the shared Beem RPC instance to use the specified nodes
 steem_ins = Steem(node=STEEM_RPC_NODES)
-steem_ins.set_password_storage('environment')
+steem_ins.set_password_storage('environment')    # Get Beem wallet pass from env var ``UNLOCK``
 set_shared_steem_instance(steem_ins)
 
-# This is used for the dropdown "Coin Type" selection in the Django admin panel.
-# Coin handlers may add to this list.
+# This is used for the dropdown "Coin Type" selection in the Django admin panel. Coin handlers may add to this list.
 COIN_TYPES = (
     ('crypto', 'Generic Cryptocurrency',),
     ('token', 'Generic Token'),
 )
 
-COIND_RPC = {}
+COIND_RPC = {}     # Used by coin_handlers.Bitcoin
 
-EX_FEE = Decimal(env('EX_FEE', '0'))
+EX_FEE = Decimal(env('EX_FEE', '0'))           # Conversion fee taken by us, in percentage (i.e. "1" = 1%)
 
-# Load coin handlers from this absolute module path
-COIN_HANDLERS_BASE = 'payments.coin_handlers'
-# The env variable 'COIN_HANDLERS' is a comma separated list of module names to load
-COIN_HANDLERS = env('COIN_HANDLERS', 'SteemEngine,Bitcoin').split(',')
+COIN_HANDLERS_BASE = 'payments.coin_handlers'  # Load coin handlers from this absolute module path
+COIN_HANDLERS = env('COIN_HANDLERS', 'SteemEngine,Bitcoin').split(',')  # A comma separated list of modules to load
 
 REST_FRAMEWORK = {
     'DEFAULT_FILTER_BACKENDS': ('django_filters.rest_framework.DjangoFilterBackend',)
 }
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True if env('DEBUG', False) in [True, 'true', 'True', 'TRUE', 1] else False
+DEBUG = env('DEBUG', False) in [True, 'true', 'True', 'TRUE', 1]
 
+# ALLOWED_HOSTS defines a list of hostnames/ips that this app can be accessed from
+# In DEBUG, we add localhost/127.0.0.1 by default, as well as when ALLOWED_HOSTS isn't set in .env
 # Specify allowed hosts in .env comma separated, e.g. ALLOWED_HOSTS=example.org,127.0.0.1,example.com
-ALLOWED_HOSTS = []
-
 _allowed_hosts = env('ALLOWED_HOSTS', None)
+ALLOWED_HOSTS = []
+ALLOWED_HOSTS += ['127.0.0.1', 'localhost'] if _allowed_hosts is None or DEBUG else ALLOWED_HOSTS
+ALLOWED_HOSTS += _allowed_hosts.split(',') if _allowed_hosts is not None else ALLOWED_HOSTS
 
-if _allowed_hosts is None or DEBUG:
-    ALLOWED_HOSTS += ['127.0.0.1']
-if _allowed_hosts is not None:
-    ALLOWED_HOSTS += _allowed_hosts.split(',')
-
-# Valid environment log levels (from least to most severe) are:
-# DEBUG, INFO, WARNING, ERROR, FATAL, CRITICAL
-CONSOLE_LOG_LEVEL = env('LOG_LEVEL', None)
-CONSOLE_LOG_LEVEL = logging.getLevelName(str(CONSOLE_LOG_LEVEL).upper()) if CONSOLE_LOG_LEVEL is not None else None
-
-if CONSOLE_LOG_LEVEL is None:
-    CONSOLE_LOG_LEVEL = logging.DEBUG if DEBUG else logging.INFO
+# Valid environment log levels (from least to most severe) are: DEBUG, INFO, WARNING, ERROR, FATAL, CRITICAL
+# Log messages to the console which are above this level.
+CONSOLE_LOG_LEVEL = env('CONSOLE_LOG_LEVEL', 'DEBUG') if DEBUG else env('LOG_LEVEL', 'INFO')
+CONSOLE_LOG_LEVEL = logging.getLevelName(CONSOLE_LOG_LEVEL.upper())
 
 LOG_FORMATTER = logging.Formatter('[%(asctime)s]: %(name)-55s -> %(funcName)-20s : %(levelname)-8s:: %(message)s')
 LOGGER_NAME = 'steemengine'
+
+# Log messages equal/above the specified level to debug.log (default: DEBUG if debug enabled, otherwise INFO)
+DBGFILE_LEVEL = env('DBGFILE_LEVEL', 'DEBUG') if DEBUG else env('LOG_LEVEL', 'INFO')
+DBGFILE_LEVEL = logging.getLevelName(DBGFILE_LEVEL.upper())
+# Log messages equal/above the specified level to error.log (default: WARNING)
+ERRFILE_LEVEL = logging.getLevelName(env('ERRFILE_LEVEL', 'WARNING').upper())
+
 _lh = LogHelper(LOGGER_NAME, formatter=LOG_FORMATTER, handler_level=logging.DEBUG)
-
-# Log to console with CONSOLE_LOG_LEVEL
-
-_lh.add_console_handler(level=CONSOLE_LOG_LEVEL)
-
-# Output logs >=info / >=warning to respective files with automatic daily log rotation (up to 14 days of logs)
+_lh.add_console_handler(level=CONSOLE_LOG_LEVEL)  # Log to console with CONSOLE_LOG_LEVEL
+# Output logs to respective files with automatic daily log rotation (up to 14 days of logs)
 log_folder = os.path.join(BASE_DIR, 'logs')
 _dbg_log = os.path.join(log_folder, 'debug.log')
 _err_log = os.path.join(log_folder, 'error.log')
 
-_lh.add_timed_file_handler(_dbg_log, when='D', interval=1, backups=14, level=logging.INFO)
-_lh.add_timed_file_handler(_err_log, when='D', interval=1, backups=14, level=logging.WARNING)
+_lh.add_timed_file_handler(_dbg_log, when='D', interval=1, backups=14, level=DBGFILE_LEVEL)
+_lh.add_timed_file_handler(_err_log, when='D', interval=1, backups=14, level=ERRFILE_LEVEL)
 
 # Use the same logging configuration for all privex modules
 _lh.copy_logger('privex')
@@ -165,7 +158,7 @@ ROOT_URLCONF = 'steemengine.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': ['payments/templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -194,6 +187,24 @@ DATABASES = {
     },
 }
 
+# By default, caching is done in local memory of the app, which is fine for development, or small scale production.
+# In production, you should probably use Memcached or database caching.
+# See https://docs.djangoproject.com/en/2.1/topics/cache/
+#
+# If you want to use Memcached, install memcached + dev headers, and pylibmc (pip3 install pylibmc)
+# then set env var CACHE_BACKEND to 'django.core.cache.backends.memcached.PyLibMCCache', and CACHE_LOCATION to
+# ``ip:port`` where 'ip' is the IP/hostname of the memcached server, and 'port' is the memcached port.
+
+# If CACHE_LOCATION is specified, we split the CACHE_LOCATION by comma to allow multiple locations
+_ch_loc = env('CACHE_LOCATION', None)
+CACHE_LOCATION = str(_ch_loc).split(',') if _ch_loc is not None else None
+
+CACHES = {
+    'default': {
+        'BACKEND': env('CACHE_BACKEND', 'django.core.cache.backends.locmem.LocMemCache'),
+        'LOCATION': CACHE_LOCATION,
+    }
+}
 
 # Password validation
 # https://docs.djangoproject.com/en/2.1/ref/settings/#auth-password-validators

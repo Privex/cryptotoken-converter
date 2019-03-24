@@ -1,6 +1,7 @@
 import logging
 from abc import ABC, abstractmethod
 from decimal import Decimal
+from typing import Tuple
 
 from django.conf import settings
 
@@ -21,7 +22,6 @@ class BaseManager(ABC):
     - The coin symbol ``self.symbol`` passed to the constructor
     - The setting_xxx fields on ``self.coin`` :class:`payments.models.Coin`
     - The Django settings `from django.conf import settings`
-    - They should also use the logging instance ``settings.LOGGER_NAME``
 
     If your class requires anything to be added to the Coin object settings, or the Django ``settings`` file,
     you should write a comment listing which settings are required, which are optional, and their format/type.
@@ -49,6 +49,22 @@ class BaseManager(ABC):
         self.symbol = symbol.upper()
         # The Coin object matching the `symbol`
         self.coin = Coin.objects.get(symbol=symbol, enabled=True)
+
+    def health(self) -> Tuple[str, tuple, tuple]:
+        """
+        Return health data for the passed symbol, e.g. current block height, block time, wallet balance
+        whether the daemon / API is accessible, etc.
+
+        It should return a tuple containing the manager name, the headings for a health table,
+        and the health data for the passed symbol (Should include a ``symbol`` or coin name column)
+
+        You may use basic HTML tags in the health data result list, such as
+        ``<b>`` ``<em>`` ``<u>`` and ``<span style=""></span>``
+
+        :return tuple health_data: (manager_name:str, headings:list/tuple, health_data:list/tuple,)
+        """
+
+        return type(self).__name__, ('Symbol', 'Status',), (self.symbol, 'Health data not supported')
 
     @abstractmethod
     def address_valid(self, address) -> bool:

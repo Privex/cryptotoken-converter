@@ -17,7 +17,7 @@
 """
 import logging
 import privex.steemengine.exceptions as SENG
-from typing import List
+from typing import List, Tuple
 from beem.exceptions import MissingKeyError
 from decimal import Decimal, getcontext, ROUND_DOWN
 from payments.coin_handlers.base import exceptions, BaseManager
@@ -68,6 +68,46 @@ class SteemEngineManager(BaseManager):
         super().__init__(symbol.upper())
         self.eng_rpc = SteemEngineToken()
 
+    def health(self) -> Tuple[str, tuple, tuple]:
+        """
+        Return health data for the passed symbol.
+
+        Health data will include: Symbol, Status, Current Block, Node Version, Wallet Balance,
+        and number of p2p connections (all as strings)
+
+        :return tuple health_data: (manager_name:str, headings:list/tuple, health_data:list/tuple,)
+        """
+        headers = ('Symbol', 'Status', 'API Node', 'Token Name', 'Issuer',
+                   'Precision', 'Our Account', 'Our Balance')
+
+        class_name = type(self).__name__
+        api_node = token_name = issuer = precision = our_account = balance = ''
+
+        status = 'Okay'
+        try:
+            rpc = self.eng_rpc
+            api_node = rpc.rpc.url
+            our_account = self.coin.our_account
+            if not rpc.account_exists(our_account):
+                status = 'Account {} not found'.format(our_account)
+            tk = rpc.get_token(self.symbol)
+            issuer = tk.get('issuer', 'ERROR GETTING ISSUER')
+            token_name = tk.get('name', 'ERROR GETTING NAME')
+            precision = str(tk.get('precision', 'ERROR GETTING PRECISION'))
+            balance = self.balance(our_account)
+            balance = ('{0:,.' + str(tk['precision']) + 'f}').format(balance)
+        except:
+            status = 'ERROR'
+            log.exception('Exception during %s.health for symbol %s', class_name, self.symbol)
+
+        if status == 'Okay':
+            status = '<b style="color: green">{}</b>'.format(status)
+        else:
+            status = '<b style="color: red">{}</b>'.format(status)
+
+        data = (self.symbol, status, api_node, token_name, issuer, precision, our_account, balance)
+        return class_name, headers, data
+
     def balance(self, address: str = None, memo: str = None, memo_case: bool = False) -> Decimal:
         """
         Get token balance for a given Steem account, if memo is given - get total symbol amt received with this memo.
@@ -79,8 +119,9 @@ class SteemEngineManager(BaseManager):
         """
 
         address = address.lower()
-        memo = memo.strip()
-        if memo is None:
+        if memo is not None:
+            memo = str(memo).strip()
+        if empty(memo):
             return self.eng_rpc.get_token_balance(user=address, symbol=self.symbol)
         txs = self.eng_rpc.list_transactions(user=address, symbol=self.symbol, limit=1000)
         bal = Decimal(0)

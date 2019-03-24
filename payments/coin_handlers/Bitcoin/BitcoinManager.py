@@ -16,7 +16,7 @@
 
 """
 import logging
-from typing import List, Dict
+from typing import List, Dict, Tuple
 
 from decimal import Decimal, getcontext, ROUND_DOWN
 from privex.jsonrpc import BitcoinRPC
@@ -65,12 +65,60 @@ class BitcoinManager(BaseManager, BitcoinMixin):
     of BitcoinRPC - stored as a static property, ensuring we don't have to constantly re-create them.
     """
 
+    def health(self) -> Tuple[str, tuple, tuple]:
+        """
+        Return health data for the passed symbol.
+
+        Health data will include: Symbol, Status, Current Block, Node Version, Wallet Balance,
+        and number of p2p connections (all as strings)
+
+        :return tuple health_data: (manager_name:str, headings:list/tuple, health_data:list/tuple,)
+        """
+        headers = ('Symbol', 'Status', 'Current Block', 'Version',
+                   'Wallet Balance', 'P2P Connections',)
+        class_name = type(self).__name__
+        status = 'Unknown Error'
+        current_block = version = balance = connections = ''
+        # If the coin is based on a newer protocol, e.g. bitcoin core + litecoin, use the new methods
+        try:
+            b = self.rpc.getblockchaininfo()
+            current_block = '{:,}'.format(b['blocks'])
+            if 'headers' in b:
+                current_block += ' (Headers: {:,})'.format(b['headers'])
+            n = self.rpc.getnetworkinfo()
+            version = '{} ({})'.format(n['version'], n['subversion'])
+            connections = str(n['connections'])
+            balance = '{0:,.8f}'.format(self.rpc.getbalance())
+            status = 'Online'
+        except:
+            # If we get an error, try using the old method
+            try:
+                b = self.rpc.getinfo()
+                current_block = '{:,}'.format(int(b['blocks']))
+                version = b['version']
+                balance = '{0:,.8f}'.format(b['balance'])
+                connections = str(b['connections'])
+                status = 'Online'
+            except:
+                log.exception('Exception during %s health check for symbol %s', class_name, self.symbol)
+                # If this also errors, it's definitely offline
+                status = 'Offline'
+
+        if status == 'Online':
+            status = '<b style="color: green">{}</b>'.format(status)
+        else:
+            status = '<b style="color: red">{}</b>'.format(status)
+
+        data = (self.symbol, status, current_block, version, balance, connections,)
+        return class_name, headers, data
+
     def __init__(self, symbol: str):
         super().__init__(symbol.upper())
         # Get all RPCs
         self.rpcs = self._get_rpcs()
         # Manager's only deal with one coin, so unwrap the generated dicts
         self.rpc = self.rpcs[symbol]           # type: BitcoinRPC
+
 
     @property
     def settings(self) -> Dict[str, dict]:
