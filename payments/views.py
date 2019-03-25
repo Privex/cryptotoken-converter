@@ -80,7 +80,7 @@ class DRFNoCSRF(SessionAuthentication):
         return  # disable csrf check
 
 
-class ConvertAPI(DRFNoCSRF, APIView):
+class ConvertAPI(APIView):
     authentication_classes = (DRFNoCSRF,)
 
     def post(self, request: Request):
