@@ -81,6 +81,7 @@ class DRFNoCSRF(SessionAuthentication):
 
 
 class ConvertAPI(DRFNoCSRF, APIView):
+    authentication_classes = (DRFNoCSRF,)
 
     def post(self, request: Request):
         try:
