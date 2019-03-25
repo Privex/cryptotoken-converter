@@ -1,5 +1,6 @@
 import logging
 from rest_framework import viewsets
+from rest_framework.authentication import SessionAuthentication
 from rest_framework.decorators import api_view
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -73,7 +74,13 @@ def r_err(msg, status=500):
     return Response(dict(error=True, message=msg), status=status)
 
 
-class ConvertAPI(APIView):
+class DRFNoCSRF(SessionAuthentication):
+
+    def enforce_csrf(self, request):
+        return  # disable csrf check
+
+
+class ConvertAPI(DRFNoCSRF, APIView):
 
     def post(self, request: Request):
         try:
