@@ -1,6 +1,13 @@
 steemengine package
 ===================
 
+Subpackages
+-----------
+
+.. toctree::
+
+    steemengine.settings
+
 Submodules
 ----------
 
@@ -8,14 +15,6 @@ steemengine.helpers module
 --------------------------
 
 .. automodule:: steemengine.helpers
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-steemengine.settings module
----------------------------
-
-.. automodule:: steemengine.settings
     :members:
     :undoc-members:
     :show-inheritance:

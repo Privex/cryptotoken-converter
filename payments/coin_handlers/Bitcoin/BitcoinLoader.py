@@ -19,11 +19,14 @@ import pytz
 from datetime import datetime
 from decimal import Decimal
 from typing import Generator, Iterable, List, Dict
+from requests.exceptions import ConnectionError
 from django.utils import timezone
 from privex.jsonrpc import BitcoinRPC
+from urllib3.exceptions import NewConnectionError
 from payments.coin_handlers.Bitcoin.BitcoinMixin import BitcoinMixin
 from payments.coin_handlers.base.BatchLoader import BatchLoader
 from payments.coin_handlers.base.decorators import retry_on_err
+from payments.coin_handlers.base.exceptions import DeadAPIError
 from steemengine.helpers import empty
 
 
@@ -76,7 +79,7 @@ class BitcoinLoader(BatchLoader, BitcoinMixin):
         """To ensure we always get fresh settings from the DB after a reload, self.settings gets _prep_settings()"""
         return self._prep_settings()
 
-    @retry_on_err()
+    @retry_on_err(fail_on=[DeadAPIError])
     def load_batch(self, symbol, limit=100, offset=0, account=None):
         """
         Loads a batch of transactions for `symbol` in their original format into `self.transactions`
@@ -89,7 +92,10 @@ class BitcoinLoader(BatchLoader, BitcoinMixin):
 
         log.debug('Loading batch of %d transactions for %s', int(limit), symbol)
         rpc = self.rpcs[symbol]
-        self.transactions = rpc.listtransactions(count=int(limit), skip=int(offset))
+        try:
+            self.transactions = rpc.listtransactions(count=int(limit), skip=int(offset))
+        except (ConnectionRefusedError, ConnectionError, NewConnectionError) as e:
+            raise DeadAPIError("{} daemon is not responding! Original exception: {} {}".format(symbol, type(e), str(e)))
 
     def clean_txs(self, symbol: str, transactions: Iterable[dict], account: str = None) -> Generator[dict, None, None]:
         """

@@ -80,7 +80,8 @@ from payments.coin_handlers.base import BaseLoader, BaseManager
 handlers = {}
 """
 A dictionary of coin symbols, containing instantiated managers (BaseManager) and loaders (BaseLoader)
-example layout:
+
+Example layout::
 
     handlers = {
         'ENG': {
@@ -92,6 +93,7 @@ example layout:
             'managers': [ SteemEngineLoader, ],
         },
     }
+
 """
 
 
@@ -138,7 +140,6 @@ def get_loaders(symbol: str = None) -> list:
 
 def has_manager(symbol: str) -> bool:
     """Helper function - does this symbol have a manager class?"""
-
     if not handlers_loaded: reload_handlers()
     return symbol.upper() in handlers and len(handlers[symbol].get('managers', [])) > 0
 
@@ -146,7 +147,7 @@ def has_manager(symbol: str) -> bool:
 def has_loader(symbol: str) -> bool:
     """Helper function - does this symbol have a loader class?"""
     if not handlers_loaded: reload_handlers()
-    return symbol.upper() in handlers and len(handlers.get('loaders', [])) > 0
+    return symbol.upper() in handlers and len(handlers[symbol].get('loaders', [])) > 0
 
 
 def get_managers(symbol: str = None) -> list:

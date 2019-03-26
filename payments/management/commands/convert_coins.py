@@ -24,6 +24,7 @@ from django.utils import timezone
 
 from payments.coin_handlers import get_manager
 from payments.coin_handlers.base.exceptions import NotEnoughBalance, AccountNotFound
+from payments.management import CronLoggerMixin
 from payments.models import Deposit, Coin, CoinPair, Conversion, AddressAccountMap
 from steemengine.helpers import empty
 
@@ -46,9 +47,12 @@ class ConvertInvalid(BaseException):
     pass
 
 
-class Command(BaseCommand):
+class Command(CronLoggerMixin, BaseCommand):
 
     help = 'Processes deposits, and handles coin conversions'
+
+    def __init__(self):
+        super(Command, self).__init__()
 
     def handle_deposit(self, deposit: Deposit):
         """

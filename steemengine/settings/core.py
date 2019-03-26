@@ -1,4 +1,36 @@
 """
+This file contains the core settings of the application. Settings specified within this file are used directly by
+the Django framework, or a third-party extension / application for Django.
+
+**User specifiable environment variables:**
+
+**Basic Config**
+
+- ``DEBUG`` - If set to true, enable debugging features, such as **extremely verbose error pages** and automatic
+  code reloading on edit. **DO NOT RUN WITH DEBUG IN PRODUCTION, IT IS NOT SAFE.**
+
+  **Default:** ``False``
+
+- ``SECRET_KEY`` - **MANDATORY** - A long random string used to encrypt user sessions, among other security features.
+
+- ``CORS_ORIGIN_ALLOW_ALL`` - If True, allow all cross-origin requests (disable whitelist). **Default:** ``True``
+
+- ``CORS_ORIGIN_WHITELIST`` - Comma separated list of domains and subdomains to allow CORS for. Adding a domain
+  does not automatically include it's subdomains. All subdomains must be added manually. **Default:** Blank
+
+- ``ALLOWED_HOSTS`` - Comma separated list of the domains you intend to run this on. For security
+  (e.g. preventing cookie theft), Django requires that you specify each hostname that this application should be
+  accessible from.
+  **Default:** ``127.0.0.1,localhost`` (these are also auto added if DEBUG is True).
+
+**Database Settings**
+
+- ``DB_BACKEND`` - What type of DB are you using? ``mysql`` or ``postgresql`` **Default:** ``postgresql``
+- ``DB_HOST`` - What hostname/ip is the DB on? **Default:** ``localhost``
+- ``DB_NAME`` - What is the name of the database to use? **Default:** ``steemengine_pay``
+- ``DB_USER`` - What username to connect with? **Default:** ``steemengine``
+- ``DB_PASS`` - What password to connect with? **Default:** no password
+
 For more information on this file, see
 https://docs.djangoproject.com/en/2.1/topics/settings/
 
@@ -22,21 +54,15 @@ Copyright::
 
 """
 
-import logging
 import os
 import sys
-from decimal import Decimal
-from importlib import import_module
 
 import dotenv
-from beem.steem import Steem
-from beem.instance import set_shared_steem_instance
 from getenv import env
-from privex.loghelper import LogHelper
 from steemengine.helpers import random_str
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 dotenv.read_dotenv(os.path.join(BASE_DIR, '.env'))
 
@@ -53,26 +79,6 @@ if SECRET_KEY is None:
     print()
     sys.exit()
 
-# Supply a list of one or more comma-separated Steem RPC nodes. If not set, will use the default beem nodes.
-STEEM_RPC_NODES = env('STEEM_RPC_NODES', None)
-STEEM_RPC_NODES = STEEM_RPC_NODES.split(',') if STEEM_RPC_NODES is not None else None
-# Set the shared Beem RPC instance to use the specified nodes
-steem_ins = Steem(node=STEEM_RPC_NODES)
-steem_ins.set_password_storage('environment')    # Get Beem wallet pass from env var ``UNLOCK``
-set_shared_steem_instance(steem_ins)
-
-# This is used for the dropdown "Coin Type" selection in the Django admin panel. Coin handlers may add to this list.
-COIN_TYPES = (
-    ('crypto', 'Generic Cryptocurrency',),
-    ('token', 'Generic Token'),
-)
-
-COIND_RPC = {}     # Used by coin_handlers.Bitcoin
-
-EX_FEE = Decimal(env('EX_FEE', '0'))           # Conversion fee taken by us, in percentage (i.e. "1" = 1%)
-
-COIN_HANDLERS_BASE = 'payments.coin_handlers'  # Load coin handlers from this absolute module path
-COIN_HANDLERS = env('COIN_HANDLERS', 'SteemEngine,Bitcoin').split(',')  # A comma separated list of modules to load
 
 REST_FRAMEWORK = {
     'DEFAULT_FILTER_BACKENDS': ('django_filters.rest_framework.DjangoFilterBackend',)
@@ -94,46 +100,6 @@ _allowed_hosts = env('ALLOWED_HOSTS', None)
 ALLOWED_HOSTS = []
 ALLOWED_HOSTS += ['127.0.0.1', 'localhost'] if _allowed_hosts is None or DEBUG else ALLOWED_HOSTS
 ALLOWED_HOSTS += _allowed_hosts.split(',') if _allowed_hosts is not None else ALLOWED_HOSTS
-
-# Valid environment log levels (from least to most severe) are: DEBUG, INFO, WARNING, ERROR, FATAL, CRITICAL
-# Log messages to the console which are above this level.
-CONSOLE_LOG_LEVEL = env('CONSOLE_LOG_LEVEL', 'DEBUG') if DEBUG else env('LOG_LEVEL', 'INFO')
-CONSOLE_LOG_LEVEL = logging.getLevelName(CONSOLE_LOG_LEVEL.upper())
-
-LOG_FORMATTER = logging.Formatter('[%(asctime)s]: %(name)-55s -> %(funcName)-20s : %(levelname)-8s:: %(message)s')
-LOGGER_NAME = 'steemengine'
-
-# Log messages equal/above the specified level to debug.log (default: DEBUG if debug enabled, otherwise INFO)
-DBGFILE_LEVEL = env('DBGFILE_LEVEL', 'DEBUG') if DEBUG else env('LOG_LEVEL', 'INFO')
-DBGFILE_LEVEL = logging.getLevelName(DBGFILE_LEVEL.upper())
-# Log messages equal/above the specified level to error.log (default: WARNING)
-ERRFILE_LEVEL = logging.getLevelName(env('ERRFILE_LEVEL', 'WARNING').upper())
-
-_lh = LogHelper(LOGGER_NAME, formatter=LOG_FORMATTER, handler_level=logging.DEBUG)
-_lh.add_console_handler(level=CONSOLE_LOG_LEVEL)  # Log to console with CONSOLE_LOG_LEVEL
-# Output logs to respective files with automatic daily log rotation (up to 14 days of logs)
-log_folder = os.path.join(BASE_DIR, 'logs')
-_dbg_log = os.path.join(log_folder, 'debug.log')
-_err_log = os.path.join(log_folder, 'error.log')
-
-_lh.add_timed_file_handler(_dbg_log, when='D', interval=1, backups=14, level=DBGFILE_LEVEL)
-_lh.add_timed_file_handler(_err_log, when='D', interval=1, backups=14, level=ERRFILE_LEVEL)
-
-# Use the same logging configuration for all privex modules
-_lh.copy_logger('privex')
-
-# Use the same logging configuration for the payments app
-_lh.copy_logger('payments')
-
-##
-# To use privex-loghelper in modules, import it like so:
-#   >>> from django.conf import settings
-#   >>> import logging
-#   >>> log = logging.getLogger(settings.LOGGER_NAME)
-#   >>> log.error('Something went wrong...')
-###
-log = _lh.get_logger()
-
 
 # Application definition
 

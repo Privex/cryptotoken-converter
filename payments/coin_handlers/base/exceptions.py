@@ -27,3 +27,7 @@ class IssuerKeyError(AuthorityMissing):
     """Attempted to issue tokens you don't have the issuer key for"""
     pass
 
+
+class DeadAPIError(BaseException):
+    """A main API, e.g. a coin daemon or public node used by this coin handler is offline."""
+    pass

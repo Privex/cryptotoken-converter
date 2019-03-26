@@ -1,11 +1,11 @@
 import logging
 
-from django.conf import settings
 from django.core.management import BaseCommand
 from django.db import transaction
 
-from payments.coin_handlers import get_loaders
+from payments.coin_handlers import get_loaders, has_loader
 from payments.coin_handlers.base import BaseLoader
+from payments.management import CronLoggerMixin
 from payments.models import Coin, Deposit
 
 """
@@ -26,17 +26,21 @@ from payments.models import Coin, Deposit
 log = logging.getLogger(__name__)
 
 
-class Command(BaseCommand):
+class Command(CronLoggerMixin, BaseCommand):
     # Amount of coin transactions to save per DB transaction
     BATCH = 100
     help = 'Imports transactions from tokens and cryptos'
 
     def __init__(self):
-        super().__init__()
-        self.coins = Coin.objects.all()
+        super(Command, self).__init__()
+        self.coins = Coin.objects.filter(enabled=True)
 
     def load_txs(self, symbol):
         log.info('Loading transactions for %s...', symbol)
+        log.debug('%s has loader? %s', symbol, has_loader(symbol))
+        if not has_loader(symbol):
+            log.warning('Coin %s is enabled, but no Coin Handler has a loader setup for it. Skipping.', symbol)
+            return
         loaders = get_loaders(symbol)
         for l in loaders:   # type: BaseLoader
             log.debug('Scanning using loader %s', type(l))
