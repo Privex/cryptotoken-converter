@@ -272,6 +272,10 @@ class Deposit(models.Model):
     # When the token was converted into the paired crypto currency (if at all)
     processed_at = models.DateTimeField('Processed At', blank=True, null=True)
 
+    @property
+    def coin_symbol(self):
+        return self.coin.symbol
+
     def __str__(self):
         return 'ID: {}, Coin: {}, TXID: {}'.format(self.id, self.coin, self.txid)
 
@@ -321,6 +325,14 @@ class Conversion(models.Model):
     # The date/time that this database entry was added/updated
     created_at = models.DateTimeField('Creation Time', auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField('Last Update', auto_now=True)
+
+    @property
+    def from_coin_symbol(self):
+        return self.from_coin.symbol
+
+    @property
+    def to_coin_symbol(self):
+        return self.to_coin.symbol
 
     @property
     def from_amount(self):

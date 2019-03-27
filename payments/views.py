@@ -2,6 +2,7 @@ import logging
 from rest_framework import viewsets
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.decorators import api_view
+from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
@@ -47,15 +48,22 @@ def api_root(request, format=None):
     })
 
 
+class CustomPaginator(LimitOffsetPagination):
+    default_limit = 100
+    max_limit = 1000
+
+
 class CoinAPI(viewsets.ReadOnlyModelViewSet):
     queryset = Coin.objects.filter(enabled=True)
     serializer_class = CoinSerializer
 
 
 class DepositAPI(viewsets.ReadOnlyModelViewSet):
-    queryset = Deposit.objects.all()
+    queryset = Deposit.objects.all().order_by('-created_at')
+    order_by = 'created'
     serializer_class = DepositSerializer
     filterset_fields = ('address', 'from_account', 'to_account', 'txid', 'memo')
+    pagination_class = CustomPaginator
 
 
 class CoinPairAPI(viewsets.ReadOnlyModelViewSet):
@@ -65,9 +73,10 @@ class CoinPairAPI(viewsets.ReadOnlyModelViewSet):
 
 
 class ConversionAPI(viewsets.ReadOnlyModelViewSet):
-    queryset = Conversion.objects.all()
+    queryset = Conversion.objects.all().order_by('-created_at')
     serializer_class = ConversionSerializer
     filterset_fields = ('from_coin', 'to_coin')
+    pagination_class = CustomPaginator
 
 
 def r_err(msg, status=500):

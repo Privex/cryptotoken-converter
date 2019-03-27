@@ -16,6 +16,7 @@ class DepositSerializer(serializers.HyperlinkedModelSerializer):
             'id',
             'txid',
             'coin',
+            'coin_symbol',
             'vout',
             'status',
             'tx_timestamp',
@@ -24,6 +25,7 @@ class DepositSerializer(serializers.HyperlinkedModelSerializer):
             'to_account',
             'amount',
             'memo',
+            'created_at',
             'processed_at',
             'convert_to'
         )
@@ -47,6 +49,9 @@ class CoinPairSerializer(serializers.HyperlinkedModelSerializer):
 
 
 class ConversionSerializer(serializers.HyperlinkedModelSerializer):
+    from_coin_symbol = serializers.ReadOnlyField()
+    to_coin_symbol = serializers.ReadOnlyField()
+
     class Meta:
         model = Conversion
         exclude = ()
