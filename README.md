@@ -27,6 +27,24 @@ user interfaces, services, and automated scripts (bots).
     +===================================================+
 ```
 
+# Documentation
+
+
+[![Read the Documentation](https://read-the-docs-guidelines.readthedocs-hosted.com/_images/logo-wordmark-dark.png)](
+https://cryptotoken-converter.readthedocs.io/en/latest/)
+
+Full documentation for this project is available above (click the Read The Docs image), including:
+
+ - How to install the application and it's dependencies 
+ - How to configure it properly
+ - How to add your own Coin Handler for new cryptocurrency/token support 
+ - General documentation of the modules and classes for contributors
+
+The documentation is written in reStructured Text, with compilation to HTML and automatically generated 
+class/module docs using Sphinx.
+
+If you'd like to contribute to our documentation, scroll down to [Building the Documentation](#building-the-documentation)
+
 # Quickstart
 
 ```bash
