@@ -122,7 +122,7 @@ def config_logger(*logger_names, log_dir=BASE_LOG_FOLDER):
 LOGGER_IS_SETUP = False
 
 if not LOGGER_IS_SETUP:
-    log = config_logger(*LOGGER_NAMES, BASE_WEB_LOGS)
+    log = config_logger(*LOGGER_NAMES, log_dir=BASE_WEB_LOGS)
     LOGGER_IS_SETUP = True
 else:
     log = logging.getLogger(BASE_LOGGER)
