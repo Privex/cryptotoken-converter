@@ -26,6 +26,7 @@ class DepositSerializer(serializers.HyperlinkedModelSerializer):
             'amount',
             'memo',
             'created_at',
+            'conversion',
             'processed_at',
             'convert_to'
         )

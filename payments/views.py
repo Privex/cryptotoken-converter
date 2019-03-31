@@ -62,7 +62,10 @@ class DepositAPI(viewsets.ReadOnlyModelViewSet):
     queryset = Deposit.objects.all().order_by('-created_at')
     order_by = 'created'
     serializer_class = DepositSerializer
-    filterset_fields = ('address', 'from_account', 'to_account', 'txid', 'memo')
+    filterset_fields = (
+        'address', 'from_account', 'to_account', 'txid', 'memo', 'conversion__to_address',
+        'conversion__to_memo', 'conversion__to_txid', 'status', 'coin'
+    )
     pagination_class = CustomPaginator
 
 
@@ -75,7 +78,10 @@ class CoinPairAPI(viewsets.ReadOnlyModelViewSet):
 class ConversionAPI(viewsets.ReadOnlyModelViewSet):
     queryset = Conversion.objects.all().order_by('-created_at')
     serializer_class = ConversionSerializer
-    filterset_fields = ('from_coin', 'to_coin')
+    filterset_fields = (
+        'from_coin', 'to_coin', 'from_address', 'to_address',
+        'deposit__from_account', 'deposit__to_account', 'deposit__memo'
+    )
     pagination_class = CustomPaginator
 
 
