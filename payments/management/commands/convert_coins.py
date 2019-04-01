@@ -50,14 +50,14 @@ class ConvertInvalid(BaseException):
     pass
 
 
-class Command(CronLoggerMixin, BaseCommand):
+class ConvertCore:
+    """
+    Various conversion logic is extracted to this class filled with static methods, so it can be used elsewhere
+    and easily tested in unit tests.
+    """
 
-    help = 'Processes deposits, and handles coin conversions'
-
-    def __init__(self):
-        super(Command, self).__init__()
-
-    def validate_deposit(self, deposit: Deposit) -> Tuple[str, CoinPair, str]:
+    @staticmethod
+    def validate_deposit(deposit: Deposit) -> Tuple[str, CoinPair, str]:
         """
         Validates and identifies the destination CoinPair and account/address of a given Deposit.
 
@@ -116,67 +116,8 @@ class Command(CronLoggerMixin, BaseCommand):
         # If there's no address, and no memo, we have no idea what to do with this deposit
         raise ConvertInvalid('No deposit address nor memo - unable to route this deposit anywhere...')
 
-    def detect_deposit(self, deposit: Deposit):
-        """
-        Validates a Deposit through various sanity checks, detects which coin the Deposit is destined for, as well as
-        where to send it to.
-
-        Stores the destination details onto deposit's the convert_xxx fields and updates the state to 'mapped'.
-
-        :param Deposit deposit: A :class:`payments.models.Deposit` object to analyze
-        :raises ConvertError: Raised when a serious error occurs that generally isn't the sender's fault.
-        :raises ConvertInvalid: Raised when a Deposit fails validation, i.e. the sender ignored our instructions.
-        """
-        d = deposit
-        if d.status != 'new':
-            raise ConvertError("Deposit is not in 'new' state during detect_deposit... Something is very wrong!")
-        try:
-            log.debug('Validating deposit and getting dest details for deposit %s', d)
-            # Validate the deposit, and grab the destination coin details
-            address, pair, dest_memo = self.validate_deposit(d)
-            # If no exception was thrown, we change the state to 'mapped' and save the destination details.
-            log.debug('Deposit mapped to destination. pair: "%s", addr: "%s", memo: "%s"', pair, address, dest_memo)
-            d.status = 'mapped'
-            d.convert_to = pair.to_coin
-            d.convert_dest_address = address
-            d.convert_dest_memo = dest_memo
-            d.save()
-            # Convert() will send the coins, update the Deposit, and create the Conversion object in the DB,
-            # as well as some additional validation such as balance checks.
-            # return self.convert(deposit=d, pair=pair, address=address)
-        except (CoinPair.DoesNotExist, Coin.DoesNotExist):
-            log.warning('Marking "inv" - no such coin pair... deposit: "%s"', d)
-            raise ConvertInvalid('Deposit is for non-existent coin pair: {}'.format(d))
-        except (ConvertError, ConvertInvalid) as e:
-            raise e   # Re-raise ConvertError / ConvertInvalid for handling by caller
-
-    def convert_deposit(self, deposit: Deposit):
-        """
-
-        :param deposit:
-        :return:
-        """
-        d = deposit
-
-        if d.status != 'mapped':
-            raise ConvertError("Deposit is not in 'mapped' state during convert_deposit... Something is very wrong!")
-        try:
-            if empty(d.convert_to) or empty(d.convert_dest_address):
-                raise ConvertError('Deposit "convert_to" or "convert_dest_addr" is empty... Cannot convert!')
-            pair = CoinPair.objects.get(from_coin=d.coin, to_coin=d.convert_to)
-            log.debug('Converting deposit ID %s from %s to %s, coin pair: %s', d.id, d.coin, d.convert_to, pair)
-            return self.convert(d, pair, d.convert_dest_address)
-
-        except (CoinPair.DoesNotExist, Coin.DoesNotExist):
-            raise ConvertInvalid('Deposit is for non-existent coin pair')
-
-        except (ConvertError, ConvertInvalid) as e:
-            raise e  # Re-raise ConvertError / ConvertInvalid for handling by caller
-
-        except:
-            raise ConvertError('Unknown error while sending TX. An admin must manually check the error logs.')
-
-    def convert(self, deposit: Deposit, pair: CoinPair, address: str, dest_memo: str = None):
+    @staticmethod
+    def convert(deposit: Deposit, pair: CoinPair, address: str, dest_memo: str = None):
         """
         After a Deposit has passed the validation checks of :py:meth:`.detect_deposit` , this method loads the
         appropriate coin handler, calculates fees, generates a memo, and sends the exchanged coins to
@@ -209,12 +150,8 @@ class Command(CronLoggerMixin, BaseCommand):
             if not empty(deposit.from_account):
                 dest_memo += ' from {} account {}'.format(src_coin, deposit.from_account)
 
-        conv_amount = Decimal(deposit.amount) * Decimal(pair.exchange_rate)  # The original conversion amount
-        ex_fee_pct = Decimal(str(settings.EX_FEE)) * Decimal('0.01')         # The exchange fee percentage
-        ex_fee = conv_amount * ex_fee_pct   # The actual Decimal amount of fee to be taken off the dest. amount
-        send_amount = conv_amount - ex_fee  # The amount of `dest_coin` we should actually try to send them
-        log.debug('deposit.amount: %f conv_amount: %f ex_fee_pct: %f ex_fee: %f send_amount: %f',
-                  deposit.amount, conv_amount, ex_fee_pct, ex_fee, send_amount)
+        send_amount, ex_fee = ConvertCore.amount_converted(deposit.amount, pair.exchange_rate, settings.EX_FEE)
+
         log.info('Attempting to send %f %s to address/account %s', send_amount, dest_coin, address)
         try:
             if tcoin.can_issue:
@@ -248,28 +185,133 @@ class Command(CronLoggerMixin, BaseCommand):
         except NotEnoughBalance:
             log.error('Not enough balance to send %f %s. Will try again later...', send_amount, dest_coin)
             try:
-                log.info('Checking if we should notify admins of low balance')
-                if tcoin.should_notify_low:
-                    log.info('Sending emails to admins to let them know of %s low balance', dest_coin)
-
-                    deposits_waiting = Deposit.objects.filter(convert_to=tcoin, status='mapped').count()
-
-                    tpl_data = dict(
-                        pair=pair, balance=mgr.balance(), deposits=deposits_waiting,
-                        amount=conv_amount, site_url=settings.SITE_URL, deposit_addr=mgr.get_deposit()[1]
-                    )
-                    html_body = render_to_string('emails/admin_lowbalance.html', tpl_data)
-                    txt_body = render_to_string('emails/admin_lowbalance.txt', tpl_data)
-                    subject = '{} hot wallet is low'.format(tcoin)
-                    mail_admins(subject, txt_body, html_message=html_body)
-                    log.info('Email sent successfully')
-                    log.debug('Setting funds_low to True, and updating last_notified')
-                    tcoin.funds_low = True
-                    tcoin.last_notified = timezone.now()
-                    tcoin.save()
+                ConvertCore.notify_low_bal(
+                    pair=pair, send_amount=send_amount, balance=mgr.balance(), deposit_addr=mgr.get_deposit()[1]
+                )
             except:
                 log.exception('Failed to send ADMINS email notifications for low balance of coin %s', dest_coin)
             return None
+
+    @staticmethod
+    def notify_low_bal(pair: CoinPair, send_amount: Decimal, balance: Decimal, deposit_addr: str):
+        """
+        Send a "low hot wallet balance" notification email to the admins, with details of what caused the low
+        balance issue. Automatically updates the low balance fields on the ``pair.to_coin`` after sending.
+
+        Will only send the email if ``pair.to_coin.should_notify_low`` is True.
+
+        :param pair: The coin pair object that triggered the low balance notification
+        :param send_amount: The amount that we tried to send
+        :param balance: The current balance of pair.to_coin
+        :param deposit_addr: An address/account for admins to deposit for re-filling the hot wallet
+        """
+        tcoin = pair.to_coin
+        log.debug('Checking if we should notify admins of low balance')
+        if tcoin.should_notify_low:
+            log.info('Sending emails to admins to let them know of %s low balance', tcoin.symbol)
+
+            deposits_waiting = Deposit.objects.filter(convert_to=tcoin, status='mapped').count()
+
+            tpl_data = dict(
+                pair=pair, balance=balance, deposits=deposits_waiting,
+                amount=send_amount, site_url=settings.SITE_URL, deposit_addr=deposit_addr
+            )
+            html_body = render_to_string('emails/admin_lowbalance.html', tpl_data)
+            txt_body = render_to_string('emails/admin_lowbalance.txt', tpl_data)
+            subject = '{} hot wallet is low'.format(tcoin)
+            mail_admins(subject, txt_body, html_message=html_body)
+            log.info('Email sent successfully')
+            log.debug('Setting funds_low to True, and updating last_notified')
+            tcoin.funds_low = True
+            tcoin.last_notified = timezone.now()
+            tcoin.save()
+
+    @staticmethod
+    def amount_converted(from_amount: Decimal, ex_rate: Decimal, fee_pct: Decimal = 0) -> Tuple[Decimal, Decimal]:
+        """
+        Handles the math for calculating the amount we should send, using an exchange rate and a percentage fee.
+
+        Example, convert 10 coins using exchange rate 0.5, with 1% exchange fee:
+
+        >>> ConvertCore.amount_converted(Decimal('10'), Decimal('0.5'), Decimal('1'))
+        ( Decimal('4.99'), Decimal('0.01'), )
+
+        Meaning, you should send 4.99, and we've taken 0.01 in fees from that amount.
+
+        :param from_amount: The base amount to convert by the exchange rate
+        :param ex_rate:     The exchange rate to use for conversion
+        :param fee_pct:     Exchange fee as a flat percentage number, e.g. 1 means 1% fee
+        :return tuple:      send_amount:Decimal, ex_fee:Decimal
+        """
+        conv_amount = from_amount * ex_rate     # The original conversion amount
+        ex_fee_pct = fee_pct * Decimal('0.01')  # The exchange fee percentage
+        ex_fee = conv_amount * ex_fee_pct       # The actual Decimal amount of fee to be taken off the dest. amount
+        send_amount = conv_amount - ex_fee      # The amount of `dest_coin` we should actually try to send them
+        return send_amount, ex_fee
+
+
+class Command(CronLoggerMixin, BaseCommand):
+
+    help = 'Processes deposits, and handles coin conversions'
+
+    def __init__(self):
+        super(Command, self).__init__()
+
+    def detect_deposit(self, deposit: Deposit):
+        """
+        Validates a Deposit through various sanity checks, detects which coin the Deposit is destined for, as well as
+        where to send it to.
+
+        Stores the destination details onto deposit's the convert_xxx fields and updates the state to 'mapped'.
+
+        :param Deposit deposit: A :class:`payments.models.Deposit` object to analyze
+        :raises ConvertError: Raised when a serious error occurs that generally isn't the sender's fault.
+        :raises ConvertInvalid: Raised when a Deposit fails validation, i.e. the sender ignored our instructions.
+        """
+        d = deposit
+        if d.status != 'new':
+            raise ConvertError("Deposit is not in 'new' state during detect_deposit... Something is very wrong!")
+        try:
+            log.debug('Validating deposit and getting dest details for deposit %s', d)
+            # Validate the deposit, and grab the destination coin details
+            address, pair, dest_memo = ConvertCore.validate_deposit(d)
+            # If no exception was thrown, we change the state to 'mapped' and save the destination details.
+            log.debug('Deposit mapped to destination. pair: "%s", addr: "%s", memo: "%s"', pair, address, dest_memo)
+            d.status = 'mapped'
+            d.convert_to = pair.to_coin
+            d.convert_dest_address = address
+            d.convert_dest_memo = dest_memo
+            d.save()
+
+            return d
+        except (CoinPair.DoesNotExist, Coin.DoesNotExist):
+            log.warning('Marking "inv" - no such coin pair... deposit: "%s"', d)
+            raise ConvertInvalid('Deposit is for non-existent coin pair')
+
+    def convert_deposit(self, deposit: Deposit):
+        """
+        Takes a Deposit in the 'mapped' state (has been through detect_deposit), and attempts to convert it
+        to the destination coin.
+
+        :param Deposit deposit: A :class:`payments.models.Deposit` object to convert
+        :raises ConvertError: Raised when a serious error occurs that generally isn't the sender's fault.
+        :raises ConvertInvalid: Raised when a Deposit fails validation, i.e. the sender ignored our instructions.
+        """
+        d = deposit
+
+        if d.status != 'mapped':
+            raise ConvertError("Deposit is not in 'mapped' state during convert_deposit... Something is very wrong!")
+        try:
+            if empty(d.convert_to) or empty(d.convert_dest_address):
+                raise ConvertError('Deposit "convert_to" or "convert_dest_addr" is empty... Cannot convert!')
+            pair = CoinPair.objects.get(from_coin=d.coin, to_coin=d.convert_to)
+            log.debug('Converting deposit ID %s from %s to %s, coin pair: %s', d.id, d.coin, d.convert_to, pair)
+            # Convert() will send the coins, update the Deposit, and create the Conversion object in the DB,
+            # as well as some additional validation such as balance checks.
+            return ConvertCore.convert(d, pair, d.convert_dest_address)
+
+        except (CoinPair.DoesNotExist, Coin.DoesNotExist):
+            raise ConvertInvalid('Deposit is for non-existent coin pair')
 
     def handle(self, *args, **options):
         # Load all "new" deposits, max of 200 in memory at a time to avoid memory leaks.
