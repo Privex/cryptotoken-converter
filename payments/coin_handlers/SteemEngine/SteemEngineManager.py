@@ -108,6 +108,21 @@ class SteemEngineManager(BaseManager):
         data = (self.symbol, status, api_node, token_name, issuer, precision, our_account, balance)
         return class_name, headers, data
 
+    def health_test(self):
+        """
+        Check if the SteemEngine API and Steem node works or not, by requesting basic information such as
+        the token metadata, and checking if our sending/receiving account exists on Steem.
+
+        :return bool: True if SteemEngine and Steem appear to be working, False if either is broken.
+        """
+        try:
+            _, _, health_data = self.health()
+            if 'Okay' in health_data[1]:
+                return True
+            return False
+        except:
+            return False
+
     def balance(self, address: str = None, memo: str = None, memo_case: bool = False) -> Decimal:
         """
         Get token balance for a given Steem account, if memo is given - get total symbol amt received with this memo.

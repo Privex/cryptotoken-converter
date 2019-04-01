@@ -154,6 +154,11 @@ class ConvertCore:
 
         log.info('Attempting to send %f %s to address/account %s', send_amount, dest_coin, address)
         try:
+            if not mgr.health_test():
+                log.warning("Coin %s health test has reported that it's down. Will try again later...", tcoin)
+                deposit.last_convert_attempt = timezone.now()
+                deposit.save()
+                return None
             if tcoin.can_issue:
                 s = mgr.send_or_issue(amount=send_amount, address=address, memo=dest_memo)
             else:
@@ -185,6 +190,8 @@ class ConvertCore:
         except NotEnoughBalance:
             log.error('Not enough balance to send %f %s. Will try again later...', send_amount, dest_coin)
             try:
+                deposit.last_convert_attempt = timezone.now()
+                deposit.save()
                 ConvertCore.notify_low_bal(
                     pair=pair, send_amount=send_amount, balance=mgr.balance(), deposit_addr=mgr.get_deposit()[1]
                 )

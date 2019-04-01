@@ -119,6 +119,19 @@ class BitcoinManager(BaseManager, BitcoinMixin):
         # Manager's only deal with one coin, so unwrap the generated dicts
         self.rpc = self.rpcs[symbol]           # type: BitcoinRPC
 
+    def health_test(self) -> bool:
+        """
+        Check if the coin daemon is up or not, by requesting basic information such as current block and version.
+
+        :return bool: True if the coin daemon appears to be working, False if it's not
+        """
+        try:
+            _, _, health_data = self.health()
+            if 'Online' in health_data[1]:
+                return True
+            return False
+        except:
+            return False
 
     @property
     def settings(self) -> Dict[str, dict]:

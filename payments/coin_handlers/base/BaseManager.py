@@ -66,6 +66,21 @@ class BaseManager(ABC):
 
         return type(self).__name__, ('Symbol', 'Status',), (self.symbol, 'Health data not supported')
 
+    def health_test(self) -> bool:
+        """
+        To reduce the risk of unhandled exceptions by sending code, this method should do some basic checks against
+        the API to test whether the coin daemon / API is responding correctly.
+
+        This allows code which calls your send() or issue() method to detect the daemon / API is not working, and
+        then delay sending/issuing until later, instead of marking a convert / withdrawal status to an error.
+
+        The method body should be wrapped in a try/except, ensuring there's a non-targeted except which
+        returns False
+
+        :return bool: True if the coin daemon / API appears to be working, False if it's not
+        """
+        return True
+
     @abstractmethod
     def address_valid(self, address) -> bool:
         """
