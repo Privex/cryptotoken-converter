@@ -112,6 +112,7 @@ class ConvertAPI(APIView):
             from_coin = str(d['from_coin']).upper()
             to_coin = str(d['to_coin']).upper()
             destination = str(d['destination'])
+            dest_memo = d.get('memo', None)
         except (AttributeError, KeyError):
             return r_err("You must specify 'from_coin', 'to_coin', and 'destination'", 400)
         # Check if the coin pair specified actually exists. If it doesn't, it'll throw a DoesNotExist.
@@ -138,11 +139,14 @@ class ConvertAPI(APIView):
             # If the coin handler uses an account system, that means we just give them our account to deposit into,
             # and generate a memo with destination coin/address details.
             res['memo'] = "{} {}".format(to_coin, destination)
+            if dest_memo is not None:
+                res['memo'] = "{} {} {}".format(to_coin, destination, dest_memo)
             res['account'] = dep_addr
         else:
             # If it's not account based, assume it's address based.
             dep_data = dict(deposit_coin=c.from_coin, deposit_address=dep_addr,
-                            destination_coin=c.to_coin, destination_address=destination)
+                            destination_coin=c.to_coin, destination_address=destination,
+                            destination_memo=dest_memo)
             res['address'] = dep_addr
             # Store the address so we can map it to their destination coin when they deposit to it.
             AddressAccountMap(**dep_data).save()
