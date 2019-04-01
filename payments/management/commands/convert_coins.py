@@ -315,7 +315,7 @@ class Command(CronLoggerMixin, BaseCommand):
             log.debug('Converting deposit ID %s from %s to %s, coin pair: %s', d.id, d.coin, d.convert_to, pair)
             # Convert() will send the coins, update the Deposit, and create the Conversion object in the DB,
             # as well as some additional validation such as balance checks.
-            return ConvertCore.convert(d, pair, d.convert_dest_address)
+            return ConvertCore.convert(d, pair, d.convert_dest_address, dest_memo=d.convert_dest_memo)
 
         except (CoinPair.DoesNotExist, Coin.DoesNotExist):
             raise ConvertInvalid('Deposit is for non-existent coin pair')
