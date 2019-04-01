@@ -13,6 +13,9 @@ User specifiable environment variables:
 - ``COIN_HANDLERS_BASE`` - If your coin handlers are not located in ``payments.coin_handlers`` then you may change this
   to point to the base module where your coin handlers are located.
 
+- ``LOWFUNDS_NOTIFY`` - If you're using the low wallet balance notifications, you can change how often it re-notifies
+  the admin emails ``ADMINS`` if the balance is still too low to fulfill a conversion. (in hours).
+  **Default:** ``12``   (hours)
 
 Copyright::
 
@@ -62,6 +65,11 @@ COIN_TYPES = (
 # Load coin handlers from this absolute module path
 COIN_HANDLERS_BASE = env('COIN_HANDLERS_BASE', 'payments.coin_handlers')
 COIN_HANDLERS = env('COIN_HANDLERS', 'SteemEngine,Bitcoin').split(',')  # A comma separated list of modules to load
+
+# After the first email to inform admins a wallet is low, how long before we send out a second notification?
+# (in hours) (Default: 12 hrs)
+LOWFUNDS_RENOTIFY = int(env('LOWFUNDS_RENOTIFY', 12))
+
 
 
 #########

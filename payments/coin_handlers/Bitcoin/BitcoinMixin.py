@@ -85,13 +85,13 @@ class BitcoinMixin:
         s = {}   # Temporary settings dict
 
         # Load handler settings from Coin objects, combine the JSON dict into our settings dict
-        log.debug('Loading Bitcoind handler settings from Coin objects')
+        # log.debug('Loading Bitcoind handler settings from Coin objects')
         for sym, c in self.all_coins.items():
             sc = c.settings     # {host,port,user,password,json}
             s[sym] = {k: v for k, v in sc.items() if k != 'json'}    # Don't include the 'json' key
             s[sym] = {**s[sym], **sc['json']}                        # Merge contents of 'json' into our settings
 
-        log.debug('Loading Bitcoind handler settings from settings.COIND_RPC (if it exists)')
+        # log.debug('Loading Bitcoind handler settings from settings.COIND_RPC (if it exists)')
         # If COIND_RPC has been set in settings.py, they take precedence over database-level settings.
         if hasattr(settings, 'COIND_RPC'):
             for symbol, conn in settings.COIND_RPC.items():
@@ -117,7 +117,7 @@ class BitcoinMixin:
         defs = self._bc_defaults
         # Loop over each symbol and settings dict we were passed
         for sym, conn in d_settings.items():  # coin symbol : str, settings: dict
-            log.debug("Cleaning settings for symbol %s", sym)
+            # log.debug("Cleaning settings for symbol %s", sym)
             z = d_settings[sym]   # Pointer to the settings dict for this symbol
             # Loop over our default settings, compare to the user's settings
             for def_key, def_val in defs.items():  # settings key : str, settings value : any

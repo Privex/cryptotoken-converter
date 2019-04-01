@@ -18,3 +18,5 @@ requests==2.21.0
 beem==0.20.19
 python-dateutil==2.8.0
 gunicorn==19.9.0
+
+Faker==1.0.4

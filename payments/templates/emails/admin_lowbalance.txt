@@ -1,0 +1,28 @@
+Dear Administrator, the {{ pair.to_coin }} wallet is running low...
+
+The conversion which triggered this, was the following:
+
+---------------------------------------------------
+
+From Coin: {{ pair.from_coin }}
+
+To Coin: {{ pair.to_coin }}
+
+Amount attempted to send: {{ amount }} {{ pair.to_coin }}
+
+---------------------------------------------------
+
+The current {{ pair.to_coin }} balance is: {{ balance }}
+
+There are currently {{ deposits }} un-processed deposits for the destination coin {{ pair.to_coin }}, some of which
+may be due to the current low balance.
+
+You should refill the hot wallet ASAP. You may deposit more {{ pair.to_coin }} to the following address/account:
+
+{{ deposit_addr }}
+
+{% if site_url %}
+---------------------------------------------------
+
+This email was sent to all admins of the website {{ site_url }}
+{% endif %}

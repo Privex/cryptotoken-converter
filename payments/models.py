@@ -28,10 +28,13 @@ dropdown list in the admin panel.
 """
 import json
 import logging
+from datetime import timedelta
+
 from django.db import models
 from django.conf import settings
 
 # Create your models here.
+from django.utils import timezone
 
 log = logging.getLogger(__name__)
 
@@ -72,6 +75,40 @@ class Coin(models.Model):
     setting_pass = models.CharField('Handler Setting - Password', blank=True, null=True, max_length=255)
     # If a handler requires additional settings, they can be specified in this custom field, usually as JSON.
     setting_json = models.TextField('Handler Setting - Custom JSON', default='{}', max_length=1000)
+
+    # When a Deposit cannot be converted because a coin doesn't have enough balance, we can send out an email to
+    # the emails listed in settings.ADMIN_EMAILS
+    notify_low_funds = models.BooleanField('Send an email notification if wallet balance low?', default=False)
+    # To avoid spamming the admins, we'll only send out repeat warnings once every 12 hrs (?) when `low_funds`
+    # is set to True by the crons.
+    # Once wallet has been topped up, `low_funds` becomes False again, allowing an alert to be
+    # sent out immediately if the balance drops too low again.
+    funds_low = models.BooleanField('Deposits are currently stuck due to low balance?', default=False)
+    last_notified = models.DateTimeField('Last Email Notification', null=True, blank=True, default=None)
+
+    @property
+    def should_notify_low(self):
+        """
+        Should we notify the admins that this coin's wallet balance is too low?
+
+        Used to rate limit "???coin wallet balance is too low" emails sent to admins.
+
+        Usage:
+
+        >>> from django.core.mail import mail_admins
+        >>> c = Coin.objects.get(symbol='BTC')
+        >>> if c.should_notify_low:
+        >>>    mail_admins('BTC hot wallet is low!', 'The hot wallet is low. Please refill.')
+
+        :return bool: ``True`` if we should notify the admins
+        :return bool: ``False`` if we should skip this email notification for now, or notifications are disabled.
+        """
+        if not self.notify_low_funds:
+            return False
+        if self.funds_low:     # If ``funds_low`` is True, we've previously notified admins of this event
+            # true if last email was sent at least ``settings.LOWFUNDS_RENOTIFY`` hours ago.
+            return (timezone.now() - self.last_notified) > timedelta(hours=settings.LOWFUNDS_RENOTIFY)
+        return True
 
     @property
     def settings(self) -> dict:
@@ -203,6 +240,11 @@ class Deposit(models.Model):
         'refund'    - The coins sent in this Deppsit were refunded
                       Info about the refund should be in the refund_* fields
 
+        'mapped'    - Deposit passed initial sanity checks, and we know the destination coin, address/account and memo.
+                      Most deposits should only stay in this state for a few seconds, before they're converted.
+                      If a deposit stays in this state for more than a few minutes, it generally means something
+                      is wrong with the Coin Handler, preventing it from sending the coins, e.g. low balance.
+
         'conv'      - Successfully Converted
                       The deposited coins were successfully converted into their destination coin, and there
                       should be a related :class:`models.Conversion` containing the conversion details.
@@ -213,6 +255,7 @@ class Deposit(models.Model):
         ('inv', 'Transaction is invalid'),
         ('refund', 'Coins were returned to user'),
         ('new', 'New (awaiting processing)'),
+        ('mapped', 'Destination data found. Awaiting conversion.'),
         ('conv', 'Successfully converted')
     )
 
@@ -253,9 +296,17 @@ class Deposit(models.Model):
 
     amount = models.DecimalField(max_digits=MAX_STORED_DIGITS, decimal_places=MAX_STORED_DP)
 
+    # NOTE: Do not rely on these two fields. If they aren't blank, that DOES NOT mean this deposit was converted.
+    # It's simply to assist in searching deposits, especially ones that have NOT yet been converted.
     convert_to = models.ForeignKey(Coin, blank=True, null=True, default=None, on_delete=models.DO_NOTHING,
                                    related_name='deposit_converts')
     """The destination coin. Set after a deposit has been analyzed, and we know what coin it will be converted to"""
+
+    convert_dest_address = models.CharField(max_length=255, null=True, blank=True)
+    """The destination address. Set after a deposit has been analyzed, and we know what coin it will be converted to."""
+
+    convert_dest_memo = models.CharField(max_length=255, null=True, blank=True)
+    """The destination memo. Set after a deposit has been analyzed, and we know what coin it will be converted to."""
 
     # If something goes wrong with this transaction, and it was refunded, then we store
     # all of the refund details, for future reference.
@@ -269,6 +320,8 @@ class Deposit(models.Model):
     # The date/time that this database entry was added/updated
     created_at = models.DateTimeField('Creation Time', auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField('Last Update', auto_now=True)
+
+    last_convert_attempt = models.DateTimeField('Last Conversion Attempt', blank=True, null=True)
     # When the token was converted into the paired crypto currency (if at all)
     processed_at = models.DateTimeField('Processed At', blank=True, null=True)
 

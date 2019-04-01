@@ -23,6 +23,7 @@ from typing import Generator, Iterable, List
 
 from dateutil.parser import parse
 from django.conf import settings
+from django.core.cache import cache
 
 from payments.coin_handlers.base.BaseLoader import BaseLoader
 from privex.steemengine import SteemEngineToken
@@ -100,9 +101,10 @@ class SteemEngineLoader(BaseLoader):
         """
         for tx in transactions:
             try:
-                if tx['from'].lower() == 'tokens': continue  # Ignore token issues
+                if tx['from'].lower() in ['tokens', 'market']: continue  # Ignore token issues and market transactions
                 if tx['to'].lower() != account.lower(): continue  # If we aren't the receiver, we don't need it.
-                token = self.eng_rpc.get_token(symbol)
+                # Cache the token for 5 mins, so we aren't spamming the token API
+                token = cache.get_or_set('stmeng:'+symbol, lambda: self.eng_rpc.get_token(symbol), 300)
                 q = tx['quantity']
                 if type(q) == float:
                     q = ('{0:.' + str(token['precision']) + 'f}').format(tx['quantity'])

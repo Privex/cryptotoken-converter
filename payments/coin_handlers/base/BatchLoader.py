@@ -6,6 +6,7 @@ from django.conf import settings
 
 from payments.coin_handlers import BaseLoader
 from payments.coin_handlers.base.decorators import retry_on_err
+from payments.coin_handlers.base.exceptions import DeadAPIError
 from payments.models import Coin
 from steemengine.helpers import empty
 
@@ -126,6 +127,8 @@ class BatchLoader(BaseLoader, ABC):
             try:
                 for tx in self._list_txs(coin=c, batch=batch):
                     yield tx
+            except DeadAPIError as e:
+                log.error('Skipping coin %s as API/Daemon is not responding: %s', c, str(e))
             except:
                 log.exception('Something went wrong while loading transactions for coin %s. Skipping for now.', c)
                 continue

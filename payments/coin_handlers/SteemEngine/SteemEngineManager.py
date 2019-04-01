@@ -112,12 +112,13 @@ class SteemEngineManager(BaseManager):
         """
         Get token balance for a given Steem account, if memo is given - get total symbol amt received with this memo.
 
-        :param address:    Steem account to get balance for
+        :param address:    Steem account to get balance for, if not set, uses self.coin.our_account
         :param memo:       If not None, get total `self.symbol` received with this memo.
         :param memo_case:  Case sensitive memo search
         :return: Decimal(balance)
         """
-
+        if address is None:
+            address = self.coin.our_account
         address = address.lower()
         if memo is not None:
             memo = str(memo).strip()

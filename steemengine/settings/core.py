@@ -101,6 +101,47 @@ ALLOWED_HOSTS = []
 ALLOWED_HOSTS += ['127.0.0.1', 'localhost'] if _allowed_hosts is None or DEBUG else ALLOWED_HOSTS
 ALLOWED_HOSTS += _allowed_hosts.split(',') if _allowed_hosts is not None else ALLOWED_HOSTS
 
+# Administrator emails to notify of important issues
+# Env var `ADMINS` should be formatted name:email,name:email
+#
+# Example: John Doe:john@example.com,Jane Doe:janed@example.com
+# Results in: [('John Doe', 'john@example.com'), ('Jane Doe', 'janed@example.com')]
+#
+ADMINS = env('ADMINS', '')
+ADMINS = [tuple(a.split(':')) for a in ADMINS.split(',')] if ADMINS != '' else []
+ADMINS = [(a.strip(), b.strip()) for a, b in ADMINS]
+
+###
+# Outgoing Email config, for notifications
+###
+
+# Used as a subject prefix for emails sent to admins from the app
+EMAIL_SUBJECT_PREFIX = env('EMAIL_SUBJECT_PREFIX', '[ConverterApp] ')
+
+# Emails have no idea what domain they're running on.
+SITE_URL = env('SITE_URL', None)
+
+# The email to use by default when sending outgoing emails
+SERVER_EMAIL = env('SERVER_EMAIL', 'noreply@example.com')
+
+EMAIL_BACKEND = env('EMAIL_BACKEND', None)
+if not EMAIL_BACKEND:
+    EMAIL_BACKEND = 'django.core.mail.backends.' + ('console.EmailBackend' if DEBUG else 'smtp.EmailBackend')
+
+# Hostname / IP of SMTP server, must be set in production for outgoing SMTP emails
+EMAIL_HOST = env('EMAIL_HOST', None)
+if EMAIL_HOST is not None:
+    EMAIL_PORT = int(env('EMAIL_PORT', 587))            # Port number to connect to email server
+    EMAIL_HOST_USER = env('EMAIL_USER', 'steemengine')  # Username for email server login
+    EMAIL_HOST_PASSWORD = env('EMAIL_PASSWORD', '')     # Password for email server login
+    # True = Use TLS for SMTP, False = Do not use any encryption
+    EMAIL_USE_TLS = env('EMAIL_TLS', True) in [True, 'true', 'True', 'TRUE', 1]
+else:
+    # If you're using the SMTP backend in production, and you don't have an email server hostname/ip set
+    # then we change your email backend to dummy (outgoing emails are simply dropped)
+    if EMAIL_BACKEND == 'django.core.mail.backends.smtp.EmailBackend':
+        EMAIL_BACKEND = 'django.core.mail.backends.dummy.EmailBackend'
+
 # Application definition
 
 INSTALLED_APPS = [

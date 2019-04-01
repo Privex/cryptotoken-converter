@@ -1,0 +1,79 @@
+<html>
+<head>
+    <style type="text/css">
+        body {
+            font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+            background: #2e353d;
+        }
+        .content {
+            min-width: 400px;
+            min-height: 600px;
+            padding: 20px;
+            margin: 10px auto;
+            width: 800px;
+            background: #ffffff;
+            border: 2px solid #0f0f0f;
+            border-radius: 10px;
+            box-shadow: 1px 1px 1px 1px #2e353d;
+        }
+
+        .address {
+            width: calc(100% - 40px);
+            background: #aaa;
+            padding: 20px;
+            border-radius: 5px;
+        }
+
+        .table {
+            border: 1px solid #000000;
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .table th, .table td {
+            padding: 5px;
+            border: 1px solid #000000;
+        }
+        .th-right th {
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+    <div class="content">
+        <h2>Dear Administrator, the {{ pair.to_coin }} wallet is running low...</h2>
+        <p>The conversion which triggered this, was the following:</p>
+        <table class="table th-right">
+            <tbody>
+                <tr>
+                    <th>From Coin</th>
+                    <td>{{ pair.from_coin }}</td>
+                </tr>
+                <tr>
+                    <th>To Coin</th>
+                    <td>{{ pair.to_coin }}</td>
+                </tr>
+                <tr>
+                    <th>Amount attempted to send</th>
+                    <td>{{ amount }} {{ pair.to_coin }}</td>
+                </tr>
+            </tbody>
+        </table>
+        <p>The current <strong>{{ pair.to_coin }}</strong> balance is: <strong>{{ balance }}</strong></p>
+        <p>There are currently <strong>{{ deposits }}</strong> un-processed deposits for the destination coin
+            <strong>{{ pair.to_coin }}</strong>, some of which may be due to the current low balance.</p>
+        <p>You should refill the hot wallet ASAP. You may deposit more {{ pair.to_coin }} to the following
+        address/account:</p>
+        <div class="address">
+            {{ deposit_addr }}
+        </div>
+        <hr/>
+        <footer>
+            <p>
+                {% if site_url %}
+                This email was sent to all admins of the website <a href="{{ site_url }}">{{ site_url }}</a>
+                {% endif %}
+            </p>
+        </footer>
+    </div>
+</body>
+</html>
