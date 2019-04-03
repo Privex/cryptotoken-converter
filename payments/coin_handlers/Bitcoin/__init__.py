@@ -11,12 +11,17 @@ It will automatically handle any :class:`payments.models.Coin` which has it's ty
 
     For each coin you intend to use with this handler, you should configure it as such:
 
-    coin_type     | This should be set to ``Bitcoind RPC compatible crypto`` (db value: bitcoind)
-    setting_host  | The IP or hostname for the daemon. If not specified, defaults to 127.0.0.1 / localhost
-    setting_port  | The RPC port for the daemon. If not specified, defaults to 8332
-    setting_user  | The rpcuser for the daemon. Generally MUST be specified.
-    setting_pass  | The rpcpassword for the daemon. Generally MUST be specified
-    setting_json  | A JSON string for optional extra config (see below)
+    =============   ==================================================================================================
+    Coin Key        Description
+    =============   ==================================================================================================
+    coin_type       This should be set to ``Bitcoind RPC compatible crypto`` (db value: bitcoind)
+    setting_host    The IP or hostname for the daemon. If not specified, defaults to 127.0.0.1 / localhost
+    setting_port    The RPC port for the daemon. If not specified, defaults to 8332
+    setting_user    The rpcuser for the daemon. Generally MUST be specified.
+    setting_pass    The rpcpassword for the daemon. Generally MUST be specified
+    setting_json    A JSON string for optional extra config (see below)
+    =============   ==================================================================================================
+
 
     Extra JSON (Handler Custom) config options:
 

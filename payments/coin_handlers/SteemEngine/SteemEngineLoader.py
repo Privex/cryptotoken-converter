@@ -17,7 +17,7 @@
 """
 
 import logging
-from decimal import Decimal
+from decimal import Decimal, getcontext, ROUND_DOWN
 from time import sleep
 from typing import Generator, Iterable, List
 
@@ -105,6 +105,7 @@ class SteemEngineLoader(BaseLoader):
                 if tx['to'].lower() != account.lower(): continue  # If we aren't the receiver, we don't need it.
                 # Cache the token for 5 mins, so we aren't spamming the token API
                 token = cache.get_or_set('stmeng:'+symbol, lambda: self.eng_rpc.get_token(symbol), 300)
+
                 q = tx['quantity']
                 if type(q) == float:
                     q = ('{0:.' + str(token['precision']) + 'f}').format(tx['quantity'])

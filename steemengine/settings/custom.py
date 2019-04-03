@@ -64,13 +64,12 @@ COIN_TYPES = (
 
 # Load coin handlers from this absolute module path
 COIN_HANDLERS_BASE = env('COIN_HANDLERS_BASE', 'payments.coin_handlers')
-COIN_HANDLERS = env('COIN_HANDLERS', 'SteemEngine,Bitcoin').split(',')  # A comma separated list of modules to load
+# A comma separated list of modules to load
+COIN_HANDLERS = env('COIN_HANDLERS', 'SteemEngine,Bitcoin,Steem').split(',')
 
 # After the first email to inform admins a wallet is low, how long before we send out a second notification?
 # (in hours) (Default: 12 hrs)
 LOWFUNDS_RENOTIFY = int(env('LOWFUNDS_RENOTIFY', 12))
-
-
 
 #########
 # Defaults for pre-installed Coin Handlers, to avoid potential exceptions when accessing their settings.

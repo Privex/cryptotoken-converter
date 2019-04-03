@@ -10,6 +10,7 @@ Subpackages
 
     payments.coin_handlers.Bitcoin
     payments.coin_handlers.SteemEngine
+    payments.coin_handlers.Steem
     payments.coin_handlers.base
 
 Module contents

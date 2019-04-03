@@ -45,7 +45,7 @@ class Command(CronLoggerMixin, BaseCommand):
         for l in loaders:   # type: BaseLoader
             log.debug('Scanning using loader %s', type(l))
             finished = False
-            l.load(1000)
+            l.load()
             txs = l.list_txs(self.BATCH)
             while not finished:
                 log.debug('Loading batch of %s TXs for DB insert', self.BATCH)
@@ -75,7 +75,8 @@ class Command(CronLoggerMixin, BaseCommand):
                     continue
                 log.debug('Storing TX %s', tx['txid'])
                 tx['coin'] = Coin.objects.get(symbol=tx['coin'])
-                Deposit(**tx).save()
+                with transaction.atomic():
+                    Deposit(**tx).save()
             except:
                 log.exception('Error saving TX %s for coin %s, will skip.', tx['txid'], tx['coin'])
             finally:

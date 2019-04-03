@@ -17,7 +17,7 @@
 import logging
 import pytz
 from datetime import datetime
-from decimal import Decimal
+from decimal import Decimal, getcontext, ROUND_DOWN
 from typing import Generator, Iterable, List, Dict
 from requests.exceptions import ConnectionError
 from django.utils import timezone
@@ -121,6 +121,7 @@ class BitcoinLoader(BatchLoader, BitcoinMixin):
         """
 
         log.debug('Filtering transactions for %s', symbol)
+
         for tx in transactions:
             t = self._clean_tx(tx, symbol, account)
             if t is None:

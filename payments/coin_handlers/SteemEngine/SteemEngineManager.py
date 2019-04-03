@@ -26,6 +26,7 @@ from steemengine.helpers import empty
 
 getcontext().rounding = ROUND_DOWN
 
+
 log = logging.getLogger(__name__)
 
 
@@ -108,7 +109,7 @@ class SteemEngineManager(BaseManager):
         data = (self.symbol, status, api_node, token_name, issuer, precision, our_account, balance)
         return class_name, headers, data
 
-    def health_test(self):
+    def health_test(self) -> bool:
         """
         Check if the SteemEngine API and Steem node works or not, by requesting basic information such as
         the token metadata, and checking if our sending/receiving account exists on Steem.
@@ -199,6 +200,7 @@ class SteemEngineManager(BaseManager):
 
         try:
             token = self.eng_rpc.get_token(symbol=self.symbol)
+
             # If we get passed a float for some reason, make sure we trim it to the token's precision before
             # converting it to a Decimal.
             if type(amount) == float:
@@ -264,6 +266,7 @@ class SteemEngineManager(BaseManager):
             from_address = self.coin.our_account
         try:
             token = self.eng_rpc.get_token(symbol=self.symbol)
+
             # If we get passed a float for some reason, make sure we trim it to the token's precision before
             # converting it to a Decimal.
             if type(amount) == float:

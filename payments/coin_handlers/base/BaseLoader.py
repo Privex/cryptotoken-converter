@@ -1,6 +1,6 @@
 import logging
 from abc import ABC, abstractmethod
-from typing import Generator
+from typing import Generator, Dict
 from django.conf import settings
 from payments.models import Coin
 
@@ -70,7 +70,7 @@ class BaseLoader(ABC):
         # self.coins is a dictionary mapping symbols to their Coin objects, for easy lookup.
         # e.g. self.coins['BTC'].display_name
         coins = Coin.objects.filter(symbol__in=symbols, enabled=True)
-        self.coins = {c.symbol: c for c in coins}
+        self.coins = {c.symbol: c for c in coins}    # type: Dict[str, Coin]
         self.symbols = self.coins.keys()
 
         # For your convenience, self.transactions is pre-defined as a list, for loading into by your functions.

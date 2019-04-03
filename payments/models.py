@@ -196,13 +196,13 @@ class AddressAccountMap(models.Model):
     # The `deposit_address` can be a crypto address, or an account name, depending on what the coin requires.
     # If you use an account name, you should specify `deposit_memo` for detecting the transaction
     deposit_coin = models.ForeignKey(Coin, db_index=True, on_delete=models.DO_NOTHING, related_name='deposit_maps')
-    deposit_address = models.CharField('Deposit Address / Account', max_length=100)
-    deposit_memo = models.CharField('Deposit Memo (if required)', max_length=255,
+    deposit_address = models.CharField('Deposit Address / Account', max_length=255)
+    deposit_memo = models.CharField('Deposit Memo (if required)', max_length=1000,
                                     blank=True, null=True, default=None)
     # The `destination_*` fields define the crypto/token that the deposited crypto/token will be converted into.
     destination_coin = models.ForeignKey(Coin, db_index=True, on_delete=models.DO_NOTHING, related_name='dest_maps')
-    destination_address = models.CharField('Destination Address / Account', max_length=100)
-    destination_memo = models.CharField('Destination Memo (if required)', max_length=255,
+    destination_address = models.CharField('Destination Address / Account', max_length=255)
+    destination_memo = models.CharField('Destination Memo (if required)', max_length=1000,
                                         blank=True, null=True, default=None)
 
     @property
@@ -278,20 +278,20 @@ class Deposit(models.Model):
     tx_timestamp = models.DateTimeField('Transaction Date/Time', blank=True, null=True)
     """The date/time the transaction actually occurred on the chain"""
 
-    address = models.CharField(max_length=100, blank=True, null=True)
+    address = models.CharField(max_length=255, blank=True, null=True)
     """If the deposit is from a classic Bitcoin-like cryptocurrency with addresses, then you should enter the
        address where the coins were deposited into, in this field."""
 
     # If the deposit is from a Bitshares-like cryptocurrency (Steem, GOLOS, EOS), then you should enter the
     # sending account into `from_account`, our receiving account into `to_account`, and memo into `memo`
     # Tokens received on Steem Engine should use these fields.
-    from_account = models.CharField(max_length=100, blank=True, null=True)
+    from_account = models.CharField(max_length=255, blank=True, null=True)
     """If account-based coin, contains the name of the account that sent the coins"""
 
-    to_account = models.CharField(max_length=100, blank=True, null=True)
+    to_account = models.CharField(max_length=255, blank=True, null=True)
     """If account-based coin, contains the name of the account that the coins were deposited into"""
 
-    memo = models.CharField(max_length=255, blank=True, null=True)
+    memo = models.CharField(max_length=1000, blank=True, null=True)
     """If the coin supports memos, and they're required to identify a deposit, use this field."""
 
     amount = models.DecimalField(max_digits=MAX_STORED_DIGITS, decimal_places=MAX_STORED_DP)
@@ -305,13 +305,13 @@ class Deposit(models.Model):
     convert_dest_address = models.CharField(max_length=255, null=True, blank=True)
     """The destination address. Set after a deposit has been analyzed, and we know what coin it will be converted to."""
 
-    convert_dest_memo = models.CharField(max_length=255, null=True, blank=True)
+    convert_dest_memo = models.CharField(max_length=1000, null=True, blank=True)
     """The destination memo. Set after a deposit has been analyzed, and we know what coin it will be converted to."""
 
     # If something goes wrong with this transaction, and it was refunded, then we store
     # all of the refund details, for future reference.
     refund_address = models.CharField('Refunded to this account/address', max_length=500, blank=True, null=True)
-    refund_memo = models.CharField(max_length=500, blank=True, null=True)
+    refund_memo = models.CharField(max_length=1000, blank=True, null=True)
     refund_coin = models.CharField('The coin (symbol) that was refunded to them', max_length=10, blank=True, null=True)
     refund_amount = models.DecimalField(max_digits=MAX_STORED_DIGITS, decimal_places=MAX_STORED_DP, default=0)
     refund_txid = models.CharField(max_length=500, blank=True, null=True)
@@ -363,7 +363,7 @@ class Conversion(models.Model):
     to_address = models.CharField('Destination Address / Account', max_length=255)
     """Where was it sent to?"""
 
-    to_memo = models.CharField('Destination Memo (if applicable)', max_length=255, blank=True, null=True)
+    to_memo = models.CharField('Destination Memo (if applicable)', max_length=1000, blank=True, null=True)
     to_amount = models.DecimalField('Amount Sent', max_digits=MAX_STORED_DIGITS, decimal_places=MAX_STORED_DP)
     """The amount of ``to_coin`` that was sent, stored as a high precision Decimal"""
 
