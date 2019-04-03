@@ -81,7 +81,7 @@ class SteemManager(BaseManager):
         self.rpc = shared_steem_instance() if empty(rpcs, itr=True) else Steem(rpcs)  # type: Steem
         self.rpc.set_password_storage(settings.get('pass_store', 'environment'))
         # For easy reference, the Beem asset object, and precision
-        self.asset = asset = Asset(self.symbol)
+        self.asset = asset = Asset(self.symbol, steem_instance=self.rpc)
         self.precision = int(asset.precision)
 
     def health(self) -> Tuple[str, tuple, tuple]:
