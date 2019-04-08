@@ -219,11 +219,11 @@ class BitcoinManager(BaseManager, BitcoinMixin):
             raise exceptions.AccountNotFound('Invalid {} address {}'.format(self.symbol, address))
         # Now let's try to send the coins
         try:
-            txid = self.rpc.sendtoaddress(address, str(amount), "", "", True,
+            txid = self.rpc.sendtoaddress(address, '{0:.8f}'.format(amount), "", "", True,
                                           force_float=not self.setting['string_amt'])
             # Fallback values if getting TX data below fails.
             fee = Decimal(0)
-            actual_amount = amount
+            actual_amount = '{0:.8f}'.format(amount)
             sender = None
             # To find out the fee, the amount after fee, and the sending addresses, we need to look up the TXID
             # This is wrapped in another try/catch to ensure badly formed TXs don't trigger the outer try/catch
@@ -250,7 +250,7 @@ class BitcoinManager(BaseManager, BitcoinMixin):
             return {
                 'txid': txid,
                 'coin': self.symbol,
-                'amount': actual_amount,
+                'amount': Decimal(actual_amount),
                 'fee': Decimal(fee),
                 'from': sender,
                 'send_type': 'send'
