@@ -53,7 +53,7 @@ class BitcoinMixin:
     # If a setting isn't specified, use these.
     _bc_defaults = dict(
         host='127.0.0.1', port=8332, user=None, password=None,
-        confirms_needed=0, use_trusted=True
+        confirms_needed=0, use_trusted=True, string_amt=True
     )
 
     @property
@@ -130,6 +130,7 @@ class BitcoinMixin:
             z['confirms_needed'] = int(z['confirms_needed'])
             z['port'] = int(z['port'])
             z['use_trusted'] = z['use_trusted'] in [True, 'true', 'True', 'TRUE', 1, 'yes']
+            z['string_amt'] = z['string_amt'] in [True, 'true', 'True', 'TRUE', 1, 'yes']
         return d_settings
 
     def _rpc_settings(self, symbol: str) -> dict:

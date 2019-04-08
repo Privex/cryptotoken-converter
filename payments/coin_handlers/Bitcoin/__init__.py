@@ -28,6 +28,8 @@ It will automatically handle any :class:`payments.models.Coin` which has it's ty
     - ``confirms_needed`` Default 0; Amount of confirmations needed before loading a TX
     - ``use_trusted`` Default: True; If enabled, TXs returned from the daemon with 'trusted':true will always be
       accepted at 0 confs regardless of ``confirms_needed``
+    - ``string_amt`` Default: True; If true, when sending coins, a ``Decimal`` will be used (as a string). This can
+      cause problems with older coins such as Dogecoin, so for older coins that need floats, set this to False.
 
 **Django Settings**:
 
@@ -47,6 +49,7 @@ It will automatically handle any :class:`payments.models.Coin` which has it's ty
               'host':     '127.0.0.1',
               'port':     8332,
               'confirms_needed': 0,
+              'string_amt': True,
               'use_trusted': True
           }
         }
