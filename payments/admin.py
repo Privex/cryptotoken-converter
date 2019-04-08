@@ -78,14 +78,14 @@ class ConversionAdmin(admin.ModelAdmin):
                     'tx_fee', 'ex_fee', 'created_at')
     list_filter = ('from_coin', 'to_coin')
     search_fields = ('id', 'from_address', 'to_address', 'to_memo', 'to_txid')
-    ordering = ('created_at',)
+    ordering = ('-created_at',)
 
 
 class DepositAdmin(admin.ModelAdmin):
     list_display = ('txid', 'status', 'coin', 'amount', 'address', 'from_account', 'to_account', 'tx_timestamp')
     list_filter = ('status', 'coin',)
     search_fields = ('id', 'txid', 'address', 'from_account', 'to_account', 'memo', 'refund_address')
-    ordering = ('created_at',)
+    ordering = ('-created_at',)
     pass
 
 
