@@ -14,7 +14,7 @@ from django.urls import path
 from django.views.decorators.cache import cache_page
 from django.views.generic import TemplateView
 
-from payments.models import Coin, Deposit, AddressAccountMap, CoinPair, Conversion
+from payments.models import Coin, Deposit, AddressAccountMap, CoinPair, Conversion, CryptoKeyPair
 
 """
     +===================================================+
@@ -89,6 +89,10 @@ class DepositAdmin(admin.ModelAdmin):
     pass
 
 
+class KeyPairAdmin(admin.ModelAdmin):
+    list_display = ('network', 'public_key', 'account')
+
+
 # Because we've overridden the admin site, the default user/group admin doesn't register properly.
 # So we manually register them to their admin views.
 ctadmin.register(User, UserAdmin)
@@ -99,6 +103,7 @@ ctadmin.register(CoinPair, CoinPairAdmin)
 ctadmin.register(Conversion, ConversionAdmin)
 ctadmin.register(Deposit, DepositAdmin)
 ctadmin.register(AddressAccountMap, AddressAccountMapAdmin)
+ctadmin.register(CryptoKeyPair, KeyPairAdmin)
 
 
 class CoinHealthView(TemplateView):

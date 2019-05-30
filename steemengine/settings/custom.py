@@ -53,6 +53,12 @@ set_shared_steem_instance(steem_ins)
 # General CryptoToken Converter settings
 ####
 
+# Used for encrypting and decrypting private keys so they cannot be displayed in plain text by the admin panel,
+# or external applications accessing the DB.
+# Generate an encryption key using ./manage.py generate_key.
+# To print just the key, use ``./manage.py generate_key 2> /dev/null``
+ENCRYPT_KEY = env('ENCRYPT_KEY')
+
 EX_FEE = Decimal(env('EX_FEE', '0'))  # Conversion fee taken by us, in percentage (i.e. "1" = 1%)
 
 

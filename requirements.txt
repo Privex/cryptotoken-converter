@@ -19,4 +19,6 @@ beem==0.20.19
 python-dateutil==2.8.0
 gunicorn==19.9.0
 
+cryptography>=2.6.1
+
 Faker==1.0.4

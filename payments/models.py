@@ -36,6 +36,8 @@ from django.conf import settings
 # Create your models here.
 from django.utils import timezone
 
+from steemengine.helpers import empty, is_encrypted, encrypt_str
+
 log = logging.getLogger(__name__)
 
 # If for some reason, you're dealing with token/crypto symbols longer than this, or tokens/coins that need more than
@@ -153,6 +155,45 @@ class Coin(models.Model):
 
     def __str__(self):
         return '{} ({})'.format(self.display_name, self.symbol)
+
+
+class CryptoKeyPair(models.Model):
+    """
+    This model allows for storing key pairs (generally for cryptocurrency addresses/accounts) safely in the database.
+
+    The private key is automatically encrypted with AES-128 upon saving, ensuring it cannot be read from the admin
+    panel, any API leaks, or third party applications reading from the database.
+
+    For this model to function correctly, you must set ENCRYPT_KEY in ``.env`` by generating an encryption key
+    using ``./manage.py generate_key``
+    """
+
+    network = models.CharField(verbose_name="Network for the key (e.g. steem, eos)", max_length=255, db_index=True)
+    private_key = models.CharField(verbose_name="Private Key (format varies per network)", max_length=1000)
+    public_key = models.CharField(blank=True, null=True, max_length=1000, db_index=True)
+    account = models.CharField(verbose_name="Username / Wallet (if required)", blank=True, null=True, max_length=255)
+    key_type = models.CharField(verbose_name="Key Type (e.g. owner / active)", max_length=255, blank=True, null=True)
+    balance = models.DecimalField(max_digits=MAX_STORED_DIGITS, decimal_places=MAX_STORED_DP, default=0)
+
+    used = models.BooleanField(default=False)
+    """For disposable addresses, e.g. Bitcoin addresses, this field tracks whether it has been used for a deposit."""
+
+    def save(self, *args, **kwargs):
+        """
+        To ensure that private keys can only be entered / updated from the admin panel and not viewed, we
+        encrypt them with AES-128 when saving.
+
+        To avoid encrypting an already encrypted key, we only encrypt the key if we're sure it's not encrypted already.
+
+        :raises EncryptionError:   Something went wrong while encrypting the key
+        :raises EncryptKeyMissing: The key ``settings.ENCRYPT_KEY`` is not set or is not a valid encryption key.
+        """
+        # If the private_key isn't already encrypted, then encrypt it with AES-128 before saving it to the DB
+        pk = self.private_key
+        if not empty(pk) and not is_encrypted(pk):
+            self.private_key = encrypt_str(pk)
+
+        return super(CryptoKeyPair, self).save(*args, **kwargs)
 
 
 class CoinPair(models.Model):
