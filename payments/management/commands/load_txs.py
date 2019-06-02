@@ -1,12 +1,14 @@
 import logging
 
 from django.core.management import BaseCommand
+from django.core.management.base import CommandParser
 from django.db import transaction
 
 from payments.coin_handlers import get_loaders, has_loader
 from payments.coin_handlers.base import BaseLoader
 from payments.management import CronLoggerMixin
 from payments.models import Coin, Deposit
+from steemengine.helpers import empty
 
 """
     +===================================================+
@@ -74,6 +76,8 @@ class Command(CronLoggerMixin, BaseCommand):
                     log.debug('Skipping TX %s as it already exists', tx['txid'])
                     continue
                 log.debug('Storing TX %s', tx['txid'])
+                log.debug(f"From: '{tx.get('from_account', 'n/a')}' - Amount: {tx['amount']} {tx['coin']}")
+                log.debug(f"Memo: '{tx.get('memo', '--NO MEMO--')}' - Time: {tx['tx_timestamp']}")
                 tx['coin'] = Coin.objects.get(symbol=tx['coin'])
                 with transaction.atomic():
                     Deposit(**tx).save()
@@ -85,8 +89,17 @@ class Command(CronLoggerMixin, BaseCommand):
                     return False
         return i < batch
 
+    def add_arguments(self, parser: CommandParser):
+        parser.add_argument('--coins', type=str, help='Comma separated list of symbols to load TXs for')
+
     def handle(self, *args, **options):
-        for c in self.coins:
+        coins = self.coins
+
+        if not empty(options['coins']):
+            coins = self.coins.filter(symbol__in=[c.upper() for c in options['coins'].split(',')])
+            log.info('Option --coins was specified. Only loading TXs for coins: %s', [str(c) for c in coins])
+
+        for c in coins:
             try:
                 self.load_txs(c.symbol)
             except:

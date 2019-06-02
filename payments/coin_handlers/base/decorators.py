@@ -33,8 +33,8 @@ def retry_on_err(max_retries: int = 3, delay: int = 3, **retry_conf):
         >>> my_func('io')
 
 
-    :param int delay:        Amount of time in seconds to sleep before re-trying the wrapped function
     :param int max_retries:  Maximum total retry attempts before giving up
+    :param int delay:        Amount of time in seconds to sleep before re-trying the wrapped function
     :param retry_conf:       Less frequently used arguments, pass in as keyword args:
 
     - (list) fail_on:  A list() of Exception types that should result in immediate failure (don't retry, raise)
@@ -74,18 +74,4 @@ def retry_on_err(max_retries: int = 3, delay: int = 3, **retry_conf):
         return wrapper
     return _decorator
 
-#
-# class ClassProperty(property):
-#     """
-#     Taken from https://stackoverflow.com/a/7864317/2648583
-#
-#     Allows for static class property functions
-#
-#     Usage:
-#
-#     >>> @ClassProperty
-#     >>>
-#
-#     """
-#     def __get__(self, cls, owner):
-#         return classmethod(self.fget).__get__(None, owner)()
+

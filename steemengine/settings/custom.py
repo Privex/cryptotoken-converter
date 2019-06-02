@@ -45,7 +45,7 @@ STEEM_RPC_NODES = env('STEEM_RPC_NODES', None)
 # Supply a list of one or more comma-separated Steem RPC nodes. If not set, will use the default beem nodes.
 STEEM_RPC_NODES = STEEM_RPC_NODES.split(',') if STEEM_RPC_NODES is not None else None
 # Set the shared Beem RPC instance to use the specified nodes
-steem_ins = Steem(node=STEEM_RPC_NODES)
+steem_ins = Steem(node=STEEM_RPC_NODES, num_retries=5, num_retries_call=3, timeout=20)
 steem_ins.set_password_storage('environment')  # Get Beem wallet pass from env var ``UNLOCK``
 set_shared_steem_instance(steem_ins)
 
@@ -71,7 +71,7 @@ COIN_TYPES = (
 # Load coin handlers from this absolute module path
 COIN_HANDLERS_BASE = env('COIN_HANDLERS_BASE', 'payments.coin_handlers')
 # A comma separated list of modules to load
-COIN_HANDLERS = env('COIN_HANDLERS', 'SteemEngine,Bitcoin,Steem').split(',')
+COIN_HANDLERS = env('COIN_HANDLERS', 'SteemEngine,Bitcoin,Steem,EOS').split(',')
 
 # After the first email to inform admins a wallet is low, how long before we send out a second notification?
 # (in hours) (Default: 12 hrs)
