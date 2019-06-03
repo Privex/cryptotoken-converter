@@ -106,6 +106,13 @@ class EOSLoader(BaseLoader, EOSMixin):
                 txid, rec, act = tr['trx_id'], tr['receipt'], tr['act']
                 to_acc = rec['receiver']
                 contract_acc, tx_type, tx_data = act['account'], act['name'], act['data']
+                if tx_type != 'transfer':
+                    continue  # if the transaction isn't a transfer, we don't care.
+
+                # ignore transactions that are missing a 'from'
+                if 'from' not in tx_data:
+                    continue
+
                 # Some transfers might not contain a memo key at all, so fallback to '' if the key doesn't exist.
                 memo, from_acc = tx_data.get('memo', ''), tx_data['from']
 
@@ -114,8 +121,7 @@ class EOSLoader(BaseLoader, EOSMixin):
                 if contract_acc != contract or to_acc != account:
                     continue
 
-                if tx_type != 'transfer':
-                    continue  # if the transaction isn't a transfer, we don't care.
+
                 if from_acc == account:
                     continue  # skip our own transactions
 
