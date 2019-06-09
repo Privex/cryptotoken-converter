@@ -21,12 +21,6 @@ class EOSLoader(BaseLoader, EOSMixin):
         self.tx_count = 1000
         self.loaded = False
 
-    # except AccountNotFound:
-    #     log.warning(f'The coin {coin} does not have `our_account` set. Refusing to load transactions.')
-    # except TokenNotFound:
-    #     log.warning(f'The coin {coin} does not exist in {__name__}.settings. Refusing to load transactions.')
-    # except MissingTokenMetadata:
-    #     log.warning(f'The coin {coin} does not have `contract` set. Refusing to load transactions.')
     def load(self, tx_count=1000):
         """
         Prepares the loader by disabling any symbols / coin objects that don't have an `our_account` set, or don't
@@ -120,7 +114,6 @@ class EOSLoader(BaseLoader, EOSMixin):
                 # not the actual user who sent it. The "receiver" (to_acc) however, should be us.
                 if contract_acc != contract or to_acc != account:
                     continue
-
 
                 if from_acc == account:
                     continue  # skip our own transactions

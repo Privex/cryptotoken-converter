@@ -22,6 +22,7 @@ from payments.coin_handlers.base import SettingsMixin
 from eospy.cleos import Cleos
 
 from payments.coin_handlers.base.exceptions import TokenNotFound, MissingTokenMetadata
+from payments.models import Coin
 from steemengine.helpers import empty
 
 log = logging.getLogger(__name__)
@@ -80,6 +81,27 @@ class EOSMixin(SettingsMixin):
 
     _eos = None   # type: Cleos
     """Shared instance of :py:class:`eospy.cleos.Cleos` used across both the loader/manager."""
+
+    @property
+    def all_coins(self) -> Dict[str, Coin]:
+        """
+        Ensures that the coin 'EOS' always has it's settings loaded by :py:class:`base.SettingsMixin` by overriding
+        this method ``all_coins`` to inject the coin EOS if it's not our symbol.
+
+        :return dict coins: A dict<str,Coin> of supported coins, mapped by symbol
+        """
+
+        if hasattr(self, 'coins'):
+            return dict(self.coins)
+        elif hasattr(self, 'coin'):
+            c = {self.coin.symbol: self.coin}
+            if self.coin.symbol.upper() != 'EOS':
+                try:
+                    c['EOS'] = Coin.objects.get(symbol='EOS')
+                except Coin.DoesNotExist:
+                    log.warning('EOSMixin cannot find a coin with the symbol "EOS"...')
+            return c
+        raise Exception('Cannot load settings as neither self.coin nor self.coins exists...')
 
     @property
     def eos_settings(self) -> Dict[str, Any]:

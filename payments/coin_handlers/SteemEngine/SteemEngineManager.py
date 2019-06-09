@@ -296,3 +296,21 @@ class SteemEngineManager(BaseManager):
             raise exceptions.NotEnoughBalance(str(e))
         except MissingKeyError:
             raise exceptions.AuthorityMissing('Missing active key for sending account {}'.format(from_address))
+
+    def send_or_issue(self, amount, address, memo=None) -> dict:
+        try:
+            log.debug(f'Attempting to send {amount} {self.symbol} to {address} ...')
+            return self.send(amount=amount, address=address, memo=memo)
+        except SENG.NotEnoughBalance:
+            acc = self.coin.our_account
+            log.debug(f'Not enough balance. Issuing {amount} {self.symbol} to our account {acc} ...')
+
+            # Issue the coins to our own account, and then send them. This prevents problems caused when issuing
+            # directly to third parties.
+            self.issue(amount=amount, address=acc, memo=f"Issuing to self before transfer to {address}")
+
+            log.debug(f'Sending newly issued coins: {amount} {self.symbol} to {address} ...')
+            tx = self.send(amount=amount, address=address, memo=memo, from_address=acc)
+            # So the calling function knows we had to issue these coins, we change the send_type back to 'issue'
+            tx['send_type'] = 'issue'
+            return tx

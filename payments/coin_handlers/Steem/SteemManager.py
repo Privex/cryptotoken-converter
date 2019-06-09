@@ -80,9 +80,22 @@ class SteemManager(BaseManager):
         # Otherwise, use the global shared_steem_instance.
         self.rpc = shared_steem_instance() if empty(rpcs, itr=True) else Steem(rpcs)  # type: Steem
         self.rpc.set_password_storage(settings.get('pass_store', 'environment'))
-        # For easy reference, the Beem asset object, and precision
-        self.asset = asset = Asset(self.symbol, steem_instance=self.rpc)
-        self.precision = int(asset.precision)
+        # Internal storage variables for the properties ``asset`` and ``precisions``
+        self._asset = self._precision = None
+
+    @property
+    def asset(self) -> Asset:
+        """Easy reference to the Beem Asset object for our current symbol"""
+        if not self._asset:
+            self._asset = Asset(self.symbol, steem_instance=self.rpc)
+        return self._asset
+
+    @property
+    def precision(self) -> int:
+        """Easy reference to the precision for our current symbol"""
+        if not self._precision:
+            self._precision = int(self.asset.precision)
+        return self._precision
 
     def health(self) -> Tuple[str, tuple, tuple]:
         """
