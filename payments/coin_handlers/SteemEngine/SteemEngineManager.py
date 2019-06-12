@@ -301,7 +301,7 @@ class SteemEngineManager(BaseManager):
         try:
             log.debug(f'Attempting to send {amount} {self.symbol} to {address} ...')
             return self.send(amount=amount, address=address, memo=memo)
-        except SENG.NotEnoughBalance:
+        except exceptions.NotEnoughBalance:
             acc = self.coin.our_account
             log.debug(f'Not enough balance. Issuing {amount} {self.symbol} to our account {acc} ...')
 
