@@ -24,3 +24,5 @@ cryptography>=2.6.1
 Faker==1.0.4
 
 libeospy==1.1.11
+
+bitshares==0.3.2
