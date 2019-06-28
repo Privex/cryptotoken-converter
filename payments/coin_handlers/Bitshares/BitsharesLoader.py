@@ -16,24 +16,31 @@
 
 """
 
+import pytz
 import logging
 from decimal import Decimal, getcontext, ROUND_DOWN
 from time import sleep
 from typing import Generator, Iterable, List
+from datetime import datetime
 
-from dateutil.parser import parse
-from django.conf import settings
 from django.core.cache import cache
+from django.utils import timezone
 
 from payments.coin_handlers.base.BaseLoader import BaseLoader
-#from privex.steemengine import SteemEngineToken
+from payments.coin_handlers.Bitshares.BitsharesMixin import BitsharesMixin
 from payments.models import Coin
 from steemengine.helpers import empty
+
+from bitshares.account import Account
+from bitshares.amount import Amount
+from bitshares.asset import Asset
+from bitsharesbase.memo import decode_memo
+from bitsharesbase.account import PrivateKey, PublicKey
 
 log = logging.getLogger(__name__)
 
 
-class BitsharesLoader(BaseLoader):
+class BitsharesLoader(BaseLoader, BitsharesMixin):
     """
     This class handles loading transactions for the **Bitshares** network, and can support almost any token
     on Bitshares.
@@ -63,33 +70,10 @@ class BitsharesLoader(BaseLoader):
 
     def __init__(self, symbols):
         super().__init__(symbols=symbols)
-        #self.eng_rpc = SteemEngineToken()
         self.tx_count = 1000
         self.loaded = False
 
-    def _list_txs(self, coin: Coin, batch=100) -> Generator[dict, None, None]:
-        """
-        Loads transactions for an individual token in batches of `batch`, conforms them to Deposit, then
-        yields each one as a dict
-        """
-        finished = False
-        offset = txs_loaded = 0
-        while not finished:
-            self.load_batch(account=coin.our_account, symbol=coin.symbol, limit=batch, offset=offset)
-            txs_loaded += len(self.transactions)
-            # If there are less remaining TXs than batch size - this usually means we've hit the end of the results.
-            # If that happens, or we've hit the transaction limit, then yield the remaining txs and exit.
-            if len(self.transactions) < batch or txs_loaded >= self.tx_count:
-                finished = True
-            # Convert the transactions to Deposit format (clean_txs is generator, so must iterate it into list)
-            txs = list(self.clean_txs(account=coin.our_account, symbol=coin.symbol, transactions=self.transactions))
-            del self.transactions   # For RAM optimization, destroy the original transaction list, as it's not needed.
-            offset += batch
-            for tx in txs:
-                yield tx
-            del txs     # At this point, the current batch is exhausted. Destroy the tx array to save memory.
-
-    def clean_txs(self, account: str, symbol: str, transactions: Iterable[dict]) -> Generator[dict, None, None]:
+    def clean_txs(self, account: Account, symbol: str, transactions: Iterable[dict]) -> Generator[dict, None, None]:
         """
         Filters a list of transactions by the receiving account, yields dict's conforming with
         :class:`payments.models.Deposit`
@@ -101,54 +85,89 @@ class BitsharesLoader(BaseLoader):
         """
         for tx in transactions:
             try:
-                if tx['from'].lower() in ['tokens', 'market']: continue  # Ignore token issues and market transactions
-                if tx['to'].lower() != account.lower(): continue  # If we aren't the receiver, we don't need it.
-                # Cache the token for 5 mins, so we aren't spamming the token API
-                token = cache.get_or_set('stmeng:'+symbol, lambda: self.eng_rpc.get_token(symbol), 300)
+                data = tx['op'][1]   # unwrap the transaction structure to get at the data within
+                
+                if data['to'] != account['id'] or data['from'] == account['id']:
+                    continue
 
-                q = tx['quantity']
-                if type(q) == float:
-                    q = ('{0:.' + str(token['precision']) + 'f}').format(tx['quantity'])
+                # cache asset data for 5 mins, so we aren't spamming the RPC node for data
+                amount_info = data['amount']
+                asset_id = amount_info['asset_id']
+                asset_key = 'btsasset:%s' % (asset_id,)
+                asset = cache.get(asset_key, default=None)
+                if asset is None:
+                    asset_obj = self.get_asset_obj(asset_id)
+                    if asset_obj is not None:
+                        asset = { 'symbol' : asset_obj.symbol, 'precision' : asset_obj.precision }
+                        cache.set(asset_key, asset, 300)
+                    else:
+                        continue
+                if asset['symbol'] != symbol:
+                    continue
+
+                raw_amount = Decimal(int(amount_info['amount']))
+                transfer_quantity = raw_amount / (10 ** asset['precision'])
+
+                # cache account data for 5 mins, so we aren't spamming the RPC node for data
+                account_key = 'btsacc:%s' % (data['from'],)
+                from_account_name = cache.get(account_key, default=data['from'])
+                if from_account_name == data['from']:
+                    from_account = self.get_account_obj(data['from'])
+                    if from_account is not None:
+                        from_account_name = from_account.name
+                        cache.set(account_key, from_account_name, 300)
+                    else:
+                        log.exception('From account not found for transaction %s', tx)
+
+                # decrypt the transaction memo
+                memo_msg = ''
+                if 'memo' in data:
+                    memo = data['memo']
+                    try:
+                        memo_msg = memo['message']
+                        memokey = self.get_private_key(account.name, 'memo')
+                        privkey = PrivateKey(memokey)
+                        pubkey  = PublicKey(memo['from'], prefix='BTS')
+                        memo_msg = decode_memo(privkey, pubkey, memo['nonce'], memo['message'])
+                    except Exception as e:
+                        memo_msg = '--cannot decode memo--'
+                        log.exception('Error decoding memo %s, got exception %s', memo['message'], e)
+
+                # fetch timestamp from the block containing this transaction
+                # (a hugely inefficient lookup but unfortunately no other way to do this)
+                tx_datetime = datetime.fromtimestamp(self.get_block_timestamp(tx['block_num']))
+                tx_datetime = timezone.make_aware(tx_datetime, pytz.UTC)
+
                 clean_tx = dict(
-                    txid=tx['txid'], coin=symbol, tx_timestamp=parse(tx['timestamp']),
-                    from_account=tx['from'], to_account=tx['to'], memo=tx['memo'],
-                    amount=Decimal(q)
+                    txid=tx['id'], coin=symbol, tx_timestamp=tx_datetime,
+                    from_account=from_account_name, to_account=account.name, memo=memo_msg,
+                    amount=transfer_quantity
                 )
                 yield clean_tx
-            except:
-                log.exception('Error parsing transaction data. Skipping this TX. tx = %s', tx)
+            except Exception as e:
+                log.exception('Error parsing transaction data. Skipping this TX. tx = %s, exception = %s', tx, e)
                 continue
 
-    def load_batch(self, account, symbol, limit=100, offset=0, retry=0):
-        """Load Bitshares transactions for account/symbol into self.transactions with automatic retry on error"""
-        try:
-            self.transactions = []
-            #self.transactions = self.eng_rpc.list_transactions(account, symbol, limit=limit, offset=offset)
-        except:
-            log.exception('Something went wrong while loading transactions for symbol %s account %s', account, symbol)
-            if retry >= 3:
-                log.error('Could not load TX data after 3 tries. Aborting.')
-                raise Exception('Failed to load TX data for {}:{} after 3 tries.'.format(account, symbol))
-            log.error('Will try again in a few seconds.')
-            sleep(3)
-            self.load_batch(account, symbol, limit, offset, retry=retry+1)
-
-    def list_txs(self, batch=100) -> Generator[dict, None, None]:
+    def list_txs(self, batch=0) -> Generator[dict, None, None]:
         """
         Get transactions for all coins in `self.coins` where the 'to' field matches coin.our_account
         If :meth:`.load()` hasn't been ran already, it will automatically call self.load()
-        :param batch: Amount of transactions to load per batch
-        :return: Generator yielding dict's that conform to :class:`models.Deposit`
+        :return: Generator yielding dicts that conform to :class:`models.Deposit`
         """
         if not self.loaded:
             self.load()
-
         for symbol, c in self.coins.items():
             try:
-                for tx in self._list_txs(coin=c, batch=batch):
-                    yield tx
+                acc_name = self.coins[symbol].our_account
+                acc = self.get_account_obj(acc_name)
+                if acc is None:
+                    log.error('Account %s not found while loading transactions for coin %s. Skipping for now.', acc_name, c)
+                    continue
+                # history returns a generator with automatic batching, so we don't have to worry about batches.
+                txs = acc.history(only_ops = ['transfer'], limit=self.tx_count)
+                yield from self.clean_txs(symbol=symbol, transactions=txs, account=acc)
             except:
-                log.exception('Something went wrong while loading transactions for coin %s. Skipping for now.', c)
+                log.exception('Error while loading transactions for coin %s. Skipping for now.', c)
                 continue
 
     def load(self, tx_count=1000):
