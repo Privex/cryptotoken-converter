@@ -15,8 +15,6 @@
     +===================================================+
 
 """
-#import logging
-#from typing import Dict, Any, List
 
 from django.conf import settings
 
@@ -32,10 +30,6 @@ from graphenecommon.exceptions import AccountDoesNotExistsException
 from graphenecommon.exceptions import AssetDoesNotExistsException
 
 from payments.coin_handlers.base.exceptions import AuthorityMissing
-#from payments.models import Coin
-#from steemengine.helpers import empty
-
-#log = logging.getLogger(__name__)
 
 
 class BitsharesMixin:

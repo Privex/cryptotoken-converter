@@ -18,8 +18,7 @@
 
 import pytz
 import logging
-from decimal import Decimal, getcontext, ROUND_DOWN
-from time import sleep
+from decimal import Decimal
 from typing import Generator, Iterable, List
 from datetime import datetime
 
@@ -42,7 +41,7 @@ log = logging.getLogger(__name__)
 
 class BitsharesLoader(BaseLoader, BitsharesMixin):
     """
-    This class handles loading transactions for the **Bitshares** network, and can support almost any token
+    This class handles loading transactions for the **Bitshares** network, and can support any token
     on Bitshares.
 
     **Copyright**::
@@ -124,7 +123,6 @@ class BitsharesLoader(BaseLoader, BitsharesMixin):
                 if 'memo' in data:
                     memo = data['memo']
                     try:
-                        memo_msg = memo['message']
                         memokey = self.get_private_key(account.name, 'memo')
                         privkey = PrivateKey(memokey)
                         pubkey  = PublicKey(memo['from'], prefix='BTS')
