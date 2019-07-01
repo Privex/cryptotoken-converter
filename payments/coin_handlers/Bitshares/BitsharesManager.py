@@ -24,7 +24,7 @@ from payments.coin_handlers.base import exceptions, BaseManager
 from payments.coin_handlers.Bitshares.BitsharesMixin import BitsharesMixin
 from django.conf import settings
 #from privex.steemengine import SteemEngineToken
-#from steemengine.helpers import empty
+from steemengine.helpers import empty
 
 from bitshares.account import Account
 from bitshares.amount import Amount
@@ -37,7 +37,7 @@ log = logging.getLogger(__name__)
 
 class BitsharesManager(BaseManager, BitsharesMixin):
     """
-    This class handles various operations for the **Bitshares* network, and supports almost any token
+    This class handles various operations for the **Bitshares* network, and supports any token
     on Bitshares.
 
     It handles:
@@ -153,24 +153,30 @@ class BitsharesManager(BaseManager, BitsharesMixin):
         :param address:    Bitshares account to get balance for, if not set, uses self.coin.our_account
         :param memo:       If not None, get total `self.symbol` received with this memo.
         :param memo_case:  Case sensitive memo search
+
+        :raises AccountNotFound:  The requested account/address doesn't exist
+
         :return: Decimal(balance)
         """
-        bal = Decimal(0)
-        #if address is None:
-        #    address = self.coin.our_account
-        #address = address.lower()
-        #if memo is not None:
-        #    memo = str(memo).strip()
-        #if empty(memo):
-        #    return self.eng_rpc.get_token_balance(user=address, symbol=self.symbol)
-        #txs = self.eng_rpc.list_transactions(user=address, symbol=self.symbol, limit=1000)
-        #bal = Decimal(0)
-        #for t in txs:
-        #    if t['to'] == address and t['symbol'] == self.symbol:
-        #        m = t['memo'].strip()
-        #        if m == memo or (not memo_case and m == memo.lower()):
-        #            bal += Decimal(t['quantity'])
-        return bal
+        balance = Decimal(0)
+        if address is None:
+            address = self.coin.our_account
+
+        if not empty(memo):
+            raise NotImplemented('Filtering by memos not implemented yet for BitsharesManager!')
+        
+        address = address.strip().lower()
+        account_obj = self.get_account_obj(address)
+        if account_obj is None:
+            raise exceptions.AccountNotFound(f'Account {address} does not exist')
+
+        asset_obj = self.get_asset_obj(self.symbol)
+        if asset_obj is not None:
+            amount_obj = account_obj.balance(self.symbol)
+            raw_amount = Decimal(int(amount_obj))
+            balance = raw_amount / (10 ** amount_obj.asset["precision"])
+
+        return balance
 
     def get_deposit(self) -> tuple:
         """
@@ -184,72 +190,21 @@ class BitsharesManager(BaseManager, BitsharesMixin):
 
     def address_valid(self, address) -> bool:
         """If an account ( ``address`` param) exists on Bitshares, will return True. Otherwise False."""
-        isSuccess = True
-
-        #try:
-        #    return self.eng_rpc.account_exists(address)
-        #except:
-        #    log.exception('Something went wrong while running %s.address_valid. Returning NOT VALID.', type(self))
-        #    return False
-        return isSuccess
+        try:
+            account_obj = self.get_account_obj(address)
+            if account_obj is None:
+                return False
+        except:
+            log.exception('Something went wrong while running %s.address_valid. Returning NOT VALID.', type(self))
+            return False
+        return True
 
     def issue(self, amount: Decimal, address: str, memo: str = None) -> dict:
         """
-        Issue (create/print) tokens to a given address/account, optionally specifying a memo if supported
-
-        Example - Issue 5.10 BUILDTEAM to @privex
-
-            >>> s = BitsharesManager('BUILDTEAM')
-            >>> s.issue(address='privex', amount=Decimal('5.10'))
-
-        :param Decimal amount:      Amount of tokens to issue, as a Decimal()
-        :param address:             Address or account to issue the tokens to
-        :param memo:                (ignored) Cannot issue tokens with a memo on Bitshares   TODO: I don't think this is true, need to add support for this
-        :raises IssuerKeyError:     Cannot issue because we don't have authority to (missing key etc.)
-        :raises IssueNotSupported:  Class does not support issuing, or requested symbol cannot be issued.
-        :raises AccountNotFound:    The requested account/address doesn't exist
-        :return dict: Result Information
-
-        Format::
-
-          {
-              txid:str - Transaction ID - None if not known,
-              coin:str - Symbol that was sent,
-              amount:Decimal - The amount that was sent (after fees),
-              fee:Decimal    - TX Fee that was taken from the amount,
-              from:str       - The account/address the coins were issued from,
-              send_type:str       - Should be statically set to "issue"
-          }
-
+        Issuing tokens is not supported for the initial release of the Bitshares coin handler. This function
+        will throw a IssueNotSupported exception if it is called.
         """
         raise exceptions.IssueNotSupported("{} does not support issuing tokens.".format(type(self).__name__))
-
-        #try:
-        #    token = self.eng_rpc.get_token(symbol=self.symbol)
-
-            # If we get passed a float for some reason, make sure we trim it to the token's precision before
-            # converting it to a Decimal.
-        #    if type(amount) == float:
-        #        amount = ('{0:.' + str(token['precision']) + 'f}').format(amount)
-        #    amount = Decimal(amount)
-        #    issuer = self.eng_rpc.get_token(self.symbol)['issuer']
-        #    log.debug('Issuing %f %s to @%s', amount, self.symbol, address)
-        #    t = self.eng_rpc.issue_token(symbol=self.symbol, to=address, amount=amount)
-        #    txid = None     # There's a risk we can't get the TXID, and so we fall back to None.
-        #    if 'transaction_id' in t:
-        #        txid = t['transaction_id']
-        #    return {
-        #        'txid': txid,
-        #        'coin': self.symbol,
-        #        'amount': amount,
-        #        'fee': Decimal(0),
-        #        'from': issuer,
-        #        'send_type': 'issue'
-        #    }
-        #except SENG.AccountNotFound as e:
-        #    raise exceptions.AccountNotFound(str(e))
-        #except MissingKeyError:
-        #    raise exceptions.IssuerKeyError('Missing active key for issuer account {}'.format(issuer))
 
     def send(self, amount, address, memo=None, from_address=None) -> dict:
         """
