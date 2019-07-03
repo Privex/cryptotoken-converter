@@ -92,11 +92,16 @@ class SteemEngineManager(BaseManager):
             if not rpc.account_exists(our_account):
                 status = 'Account {} not found'.format(our_account)
             tk = rpc.get_token(self.symbol)
+            if empty(tk, itr=True):
+                raise exceptions.TokenNotFound('Token data was empty')
             issuer = tk.get('issuer', 'ERROR GETTING ISSUER')
             token_name = tk.get('name', 'ERROR GETTING NAME')
             precision = str(tk.get('precision', 'ERROR GETTING PRECISION'))
             balance = self.balance(our_account)
             balance = ('{0:,.' + str(tk['precision']) + 'f}').format(balance)
+        except exceptions.TokenNotFound:
+            status = 'ERROR'
+            token_name = '<b style="color: red">Token does not exist...</b>'
         except:
             status = 'ERROR'
             log.exception('Exception during %s.health for symbol %s', class_name, self.symbol)
