@@ -15,8 +15,10 @@
     +===================================================+
 
 """
-
+import logging
+from decimal import Decimal
 from django.conf import settings
+from typing import List
 
 from payments.models import CryptoKeyPair
 from steemengine.helpers import decrypt_str
@@ -25,11 +27,16 @@ from bitshares import BitShares
 from bitshares.account import Account
 from bitshares.asset import Asset
 from bitshares.blockchain import Blockchain
+from bitshares.amount import Amount
 
 from graphenecommon.exceptions import AccountDoesNotExistsException
 from graphenecommon.exceptions import AssetDoesNotExistsException
+from graphenecommon.exceptions import InvalidWifError
+from graphenecommon.exceptions import KeyAlreadyInStoreException
 
 from payments.coin_handlers.base.exceptions import AuthorityMissing
+
+log = logging.getLogger(__name__)
 
 
 class BitsharesMixin:
@@ -69,7 +76,7 @@ class BitsharesMixin:
     def bitshares(self) -> BitShares:
         """Returns an instance of BitShares and caches it in the attribute _bitshares after creation"""
         if not self._bitshares:
-            self._bitshares = BitShares(settings.BITSHARES_RPC_NODE, bundle=True)
+            self._bitshares = BitShares(settings.BITSHARES_RPC_NODE, bundle=True, keys=[])
         return self._bitshares
     
     @property
@@ -117,6 +124,12 @@ class BitsharesMixin:
         except:
             return 0
 
+    def get_decimal_from_amount(self, amount_obj: Amount) -> Decimal:
+        """Helper function to convert a Bitshares Amount object into a Decimal"""
+        raw_amount = Decimal(int(amount_obj))
+        balance = raw_amount / (10 ** amount_obj.asset['precision'])
+        return balance
+
     def get_private_key(self, account_name, key_type) -> str:
         """
         Find the Bitshares :py:class:`models.CryptoKeyPair` in the database for a given account `account_name` and
@@ -143,3 +156,27 @@ class BitsharesMixin:
         priv_key = decrypt_str(kp[0].private_key)
 
         return priv_key
+
+    def set_wallet_keys(self, account_name, key_types: List[str]):
+        """
+        Retrieves a :py:class:`models.CryptoKeyPair` for a given account `account_name` and each key type specified
+        in the key_types list (e.g. 'active' or 'memo'). Each private key is then decrypted and added to the
+        underlying Bitshares wallet for use in transactions.
+
+        If no matching key could be found, will raise an AuthorityMissing exception.
+
+        :param str account_name: The Bitshares account to set keys for
+        :param List key_types:   Key types to search for. Can include 'active', 'memo', or 'owner'
+
+        :raises AuthorityMissing:  A key could be found for the given `account_name`
+        :raises EncryptKeyMissing: CTC admin did not set ENCRYPT_KEY in their `.env`, or it is invalid
+        :raises EncryptionError:   Something went wrong while decrypting the private key (maybe ENCRYPT_KEY is invalid)
+        """
+        for key_type in key_types:
+            private_key = self.get_private_key(account_name, key_type)
+            try:
+                self.bitshares.wallet.addPrivateKey(private_key)
+            except KeyAlreadyInStoreException:
+                log.debug(f'Private key for Bitshares account {account_name} matching type {key_type} already exists in the key store, so not adding it again')
+            except InvalidWifError:
+                raise AuthorityMissing(f'Invalid key format for Bitshares account {account_name} matching type: {key_type}')

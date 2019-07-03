@@ -16,18 +16,18 @@
 
 """
 import logging
-#import privex.steemengine.exceptions as SENG
 from typing import List, Tuple
-#from beem.exceptions import MissingKeyError
 from decimal import Decimal, getcontext, ROUND_DOWN
 from payments.coin_handlers.base import exceptions, BaseManager
 from payments.coin_handlers.Bitshares.BitsharesMixin import BitsharesMixin
 from django.conf import settings
-#from privex.steemengine import SteemEngineToken
 from steemengine.helpers import empty
 
 from bitshares.account import Account
 from bitshares.amount import Amount
+from bitshares.memo import Memo
+from bitsharesbase import operations
+from graphenecommon.exceptions import KeyNotFound
 
 getcontext().rounding = ROUND_DOWN
 
@@ -99,10 +99,10 @@ class BitsharesManager(BaseManager, BitsharesMixin):
                 issuer = precision_str
                 status = 'ERROR'
             else:
-                precision_str = str(our_asset["precision"])
-                issuer_obj = self.get_account_obj(our_asset["issuer"])
+                precision_str = str(our_asset['precision'])
+                issuer_obj = self.get_account_obj(our_asset['issuer'])
                 if issuer_obj is None:
-                    issuer = our_asset["issuer"]
+                    issuer = our_asset['issuer']
                 else:
                     issuer = issuer_obj.name
 
@@ -116,9 +116,8 @@ class BitsharesManager(BaseManager, BitsharesMixin):
                     balance_str = '0.0'
                 else:
                     amount_obj = our_account.balance(self.symbol)
-                    raw_amount = Decimal(int(amount_obj))
-                    balance = raw_amount / (10 ** amount_obj.asset["precision"])
-                    balance_str = ('{0:,.' + str(amount_obj.asset["precision"]) + 'f}').format(balance)
+                    balance = self.get_decimal_from_amount(amount_obj)
+                    balance_str = ('{0:,.' + str(amount_obj.asset['precision']) + 'f}').format(balance)
         except:
             status = 'UNHANDLED EXCEPTION (see logs)'
             log.exception('Exception during %s.health for symbol %s', class_name, self.symbol)
@@ -173,8 +172,7 @@ class BitsharesManager(BaseManager, BitsharesMixin):
         asset_obj = self.get_asset_obj(self.symbol)
         if asset_obj is not None:
             amount_obj = account_obj.balance(self.symbol)
-            raw_amount = Decimal(int(amount_obj))
-            balance = raw_amount / (10 ** amount_obj.asset["precision"])
+            balance = self.get_decimal_from_amount(amount_obj)
 
         return balance
 
@@ -206,9 +204,24 @@ class BitsharesManager(BaseManager, BitsharesMixin):
         """
         raise exceptions.IssueNotSupported("{} does not support issuing tokens.".format(type(self).__name__))
 
+    def is_amount_above_minimum(self, amount: Decimal, precision: int) -> bool:
+        """
+        Helper function to test if amount is at least equal to the minimum allowed fractional unit
+        of our token. Returns True if so, otherwise False.
+        """
+        minimum_unit = Decimal('1.0')
+        minimum_unit = minimum_unit / (10 ** precision)
+        if amount < minimum_unit:
+            return False
+        return True
+
     def send(self, amount, address, memo=None, from_address=None) -> dict:
         """
-        Send tokens to a given address/account, optionally specifying a memo if supported
+        Send tokens to a given address/account, optionally specifying a memo. The Bitshares network transaction fee
+        will be subtracted from the amount before sending.
+
+        There must be a valid :py:class:`models.CryptoKeyPair` in the database for both 'active' and 'memo' keys for the
+        from_address account, or an AuthorityMissing exception will be thrown.
 
         Example - send 1.23 BUILDTEAM from @someguy123 to @privex with memo 'hello'
 
@@ -218,9 +231,10 @@ class BitsharesManager(BaseManager, BitsharesMixin):
         :param Decimal amount:      Amount of tokens to send, as a Decimal()
         :param address:             Account to send the tokens to
         :param from_address:        Account to send the tokens from
-        :param memo:                Memo to send tokens with (if supported)
+        :param memo:                Memo to send tokens with
         :raises AttributeError:     When both `from_address` and `self.coin.our_account` are blank.
         :raises ArithmeticError:    When the amount is lower than the lowest amount allowed by the token's precision
+                                    (after subtracting the network transaction fee)
         :raises AuthorityMissing:   Cannot send because we don't have authority to (missing key etc.)
         :raises AccountNotFound:    The requested account/address doesn't exist
         :raises TokenNotFound:      When the requested token `symbol` does not exist
@@ -239,61 +253,116 @@ class BitsharesManager(BaseManager, BitsharesMixin):
           }
 
         """
-        raise NotImplemented("{}.send must be implemented!".format(type(self).__name__))
         # Try from_address first. If that's empty, try using self.coin.our_account. If both are empty, abort.
-        #if empty(from_address):
-        #    if empty(self.coin.our_account):
-        #        raise AttributeError("Both 'from_address' and 'coin.our_account' are empty. Cannot send.")
-        #    from_address = self.coin.our_account
-        #try:
-        #    token = self.eng_rpc.get_token(symbol=self.symbol)
+        if empty(from_address):
+            if empty(self.coin.our_account):
+                raise AttributeError("Both 'from_address' and 'coin.our_account' are empty. Cannot send.")
+            from_address = self.coin.our_account
 
-            # If we get passed a float for some reason, make sure we trim it to the token's precision before
-            # converting it to a Decimal.
-        #    if type(amount) == float:
-        #        amount = ('{0:.' + str(token['precision']) + 'f}').format(amount)
-        #    amount = Decimal(amount)
+        # make sure we have the necessary private keys loaded (memo key for encrypting memo, active key for sending coins)
+        self.set_wallet_keys(from_address, [ 'memo', 'active' ])
 
-        #    log.debug('Sending %f %s to @%s', amount, self.symbol, address)
+        asset_obj = self.get_asset_obj(self.symbol)
+        if asset_obj is None:
+            raise exceptions.TokenNotFound(f'Failed to send because {self.symbol} is an invalid token symbol.')
 
-        #    t = self.eng_rpc.send_token(symbol=self.symbol, from_acc=from_address,
-        #                                to_acc=address, amount=amount, memo=memo)
-        #    txid = None  # There's a risk we can't get the TXID, and so we fall back to None.
-        #    if 'transaction_id' in t:
-        #        txid = t['transaction_id']
-        #    return {
-        #        'txid': txid,
-        #        'coin': self.symbol,
-        #        'amount': amount,
-        #        'fee': Decimal(0),
-        #        'from': from_address,
-        #        'send_type': 'send'
-        #    }
-        #except SENG.AccountNotFound as e:
-        #    raise exceptions.AccountNotFound(str(e))
-        #except SENG.TokenNotFound as e:
-        #    raise exceptions.TokenNotFound(str(e))
-        #except SENG.NotEnoughBalance as e:
-        #    raise exceptions.NotEnoughBalance(str(e))
-        #except MissingKeyError:
-        #    raise exceptions.AuthorityMissing('Missing active key for sending account {}'.format(from_address))
+        # trim input amount to the token's precision just to be safe
+        str_amount = ('{0:.' + str(asset_obj['precision']) + 'f}').format(amount)
+        amount = Decimal(str_amount)
+
+        if not self.is_amount_above_minimum(amount, asset_obj['precision']):
+            raise ArithmeticError(f'Failed to send because {amount} is less than the minimum amount allowed for {self.symbol} tokens.')
+
+        from_account = self.get_account_obj(from_address)
+        if from_account is None:
+            raise exceptions.AccountNotFound(f'Failed to send because source account {from_address} could not be found.')
+        to_account = self.get_account_obj(address)
+        if to_account is None:
+            raise exceptions.AccountNotFound(f'Failed to send because destination account {address} could not be found.')
+
+        # verify from_account balance is sufficient for the transaction
+        from_account_balance = self.get_decimal_from_amount(from_account.balance(self.symbol))
+        if from_account_balance < amount:
+            raise exceptions.NotEnoughBalance(f'Failed to send because source account {from_address} balance {from_account_balance} {self.symbol} is less than amount to send ({amount} {self.symbol}).')
+
+        amount_obj = Amount(str_amount, self.symbol, blockchain_instance=self.bitshares)
+
+        try:
+            if memo is None:
+                memo = ''
+            memo_obj = Memo(from_account=from_account, to_account=to_account, blockchain_instance=self.bitshares)
+            encrypted_memo = memo_obj.encrypt(memo)
+
+            # build preliminary transaction object, without network transaction fee
+            op = operations.Transfer(
+                **{
+                    'fee': {'amount': 0, 'asset_id': amount_obj.asset['id']},
+                    'from': from_account['id'],
+                    'to': to_account['id'],
+                    'amount': {'amount': int(amount_obj), 'asset_id': amount_obj.asset['id']},
+                    'memo': encrypted_memo,
+                    'prefix': self.bitshares.prefix,
+                }
+            )
+
+            # calculate how much the transaction fee is - rather clunky method here but it works
+            ops = [self.bitshares.txbuffer.operation_class(op)]
+            ops_with_fees = self.bitshares.txbuffer.add_required_fees(ops, asset_id=amount_obj.asset['id'])
+            raw_fee_amount = Decimal(str(ops_with_fees[0][1].data['fee']['amount']))
+            fee_amount_str = '{0:f}'.format(raw_fee_amount / (10 ** amount_obj.asset['precision']))
+            fee_amount = Amount(fee_amount_str, self.symbol, blockchain_instance=self.bitshares)
+            amount_obj = amount_obj - fee_amount
+
+            # verify the amount still makes sense after subtracting the transaction fee
+            if int(amount_obj) < 1:
+                raise ArithmeticError(f'Failed to send because {amount} is less than the network transaction fee of {fee_amount_str} {self.symbol} tokens.')
+
+            # correct the transaction object to take into account the transaction fee
+            adj_op = operations.Transfer(
+                **{
+                    'fee': {'amount': int(fee_amount), 'asset_id': amount_obj.asset['id']},
+                    'from': from_account['id'],
+                    'to': to_account['id'],
+                    'amount': {'amount': int(amount_obj), 'asset_id': amount_obj.asset['id']},
+                    'memo': encrypted_memo,
+                    'prefix': self.bitshares.prefix,
+                }
+            )
+
+            log.debug('doing Bitshares transaction - from_address[%s], address[%s], amount[%s %s], fee_amount[%s], amount_obj[%s], memo[%s]', from_address, address, str_amount, self.symbol, fee_amount, amount_obj, memo)
+
+            # and finally, do the op!
+            self.bitshares.finalizeOp(adj_op, from_address, "active", fee_asset=amount_obj.asset['id'])
+            result = self.bitshares.broadcast()
+        except KeyNotFound as e:
+            raise exceptions.AuthorityMissing(str(e))
+
+        return {
+            'txid': None,     # transaction ID is not readily available from the Bitshares API
+            'coin': self.symbol,
+            'amount': self.get_decimal_from_amount(amount_obj),
+            'fee': self.get_decimal_from_amount(fee_amount),
+            'from': from_address,
+            'send_type': 'send'
+        }
 
     def send_or_issue(self, amount, address, memo=None) -> dict:
+        """
+        Issuing tokens is not supported for the initial release of the Bitshares coin handler. This function
+        should not be used until such support has been added.
+        """
         try:
             log.debug(f'Attempting to send {amount} {self.symbol} to {address} ...')
             return self.send(amount=amount, address=address, memo=memo)
-        except Exception as e:
-            log.debug(f'Got exception {e}')
-        #except exceptions.NotEnoughBalance:
-        #    acc = self.coin.our_account
-        #    log.debug(f'Not enough balance. Issuing {amount} {self.symbol} to our account {acc} ...')
+        except exceptions.NotEnoughBalance:
+            acc = self.coin.our_account
+            log.debug(f'Not enough balance. Issuing {amount} {self.symbol} to our account {acc} ...')
 
-            # Issue the coins to our own account, and then send them. This prevents problems caused when issuing
-            # directly to third parties.
-        #    self.issue(amount=amount, address=acc, memo=f"Issuing to self before transfer to {address}")
+            # Issue the coins to our own account, and then send them.
+            self.issue(amount=amount, address=acc, memo=f"Issuing to self before transfer to {address}")
 
-        #    log.debug(f'Sending newly issued coins: {amount} {self.symbol} to {address} ...')
-        #    tx = self.send(amount=amount, address=address, memo=memo, from_address=acc)
+            log.debug(f'Sending newly issued coins: {amount} {self.symbol} to {address} ...')
+            tx = self.send(amount=amount, address=address, memo=memo, from_address=acc)
             # So the calling function knows we had to issue these coins, we change the send_type back to 'issue'
-        #    tx['send_type'] = 'issue'
-        #    return tx
+            tx['send_type'] = 'issue'
+            return tx
