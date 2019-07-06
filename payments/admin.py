@@ -54,6 +54,7 @@ ctadmin = CustomAdmin()
 class CoinAdmin(admin.ModelAdmin):
     list_display = ('__str__', 'symbol', 'coin_type', 'enabled', 'our_account', 'can_issue')
     list_filter = ('coin_type',)
+    ordering = ('symbol',)
 
     def get_fieldsets(self, request, obj=None):
         # To ensure that the Coin Type dropdown is properly populated, we call reload_handlers() just before
@@ -70,7 +71,8 @@ class AddressAccountMapAdmin(admin.ModelAdmin):
 
 
 class CoinPairAdmin(admin.ModelAdmin):
-    pass
+    list_display = ('__str__', 'from_coin', 'to_coin', 'exchange_rate')
+    ordering = ('from_coin', 'to_coin')
 
 
 class ConversionAdmin(admin.ModelAdmin):
@@ -85,12 +87,12 @@ class DepositAdmin(admin.ModelAdmin):
     list_display = ('txid', 'status', 'coin', 'amount', 'address', 'from_account', 'to_account', 'tx_timestamp')
     list_filter = ('status', 'coin',)
     search_fields = ('id', 'txid', 'address', 'from_account', 'to_account', 'memo', 'refund_address')
-    ordering = ('-created_at',)
-    pass
+    ordering = ('-tx_timestamp',)
 
 
 class KeyPairAdmin(admin.ModelAdmin):
     list_display = ('network', 'public_key', 'account')
+    ordering = ('network', 'account')
 
 
 # Because we've overridden the admin site, the default user/group admin doesn't register properly.
