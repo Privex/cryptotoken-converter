@@ -54,6 +54,7 @@ class CustomPaginator(LimitOffsetPagination):
 
 
 class CoinAPI(viewsets.ReadOnlyModelViewSet):
+    lookup_value_regex = '[^/]+'
     queryset = Coin.objects.filter(enabled=True)
     serializer_class = CoinSerializer
 
@@ -70,6 +71,7 @@ class DepositAPI(viewsets.ReadOnlyModelViewSet):
 
 
 class CoinPairAPI(viewsets.ReadOnlyModelViewSet):
+    lookup_value_regex = '[^/]+'
     queryset = CoinPair.objects.filter(from_coin__enabled=True, to_coin__enabled=True)
     serializer_class = CoinPairSerializer
     filterset_fields = ('from_coin', 'to_coin')
