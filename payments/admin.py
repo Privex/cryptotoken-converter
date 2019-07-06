@@ -1,5 +1,7 @@
 import logging
+from decimal import Decimal
 
+from django.conf import settings
 from django.contrib import admin, messages
 
 # Register your models here.
@@ -13,6 +15,7 @@ from django.shortcuts import render, redirect
 from django.urls import path
 from django.views.decorators.cache import cache_page
 from django.views.generic import TemplateView
+from privex.helpers import empty, is_true
 
 from payments.models import Coin, Deposit, AddressAccountMap, CoinPair, Conversion, CryptoKeyPair
 
@@ -44,6 +47,7 @@ class CustomAdmin(AdminSite):
         _urls = super(CustomAdmin, self).get_urls()
         urls = [
             path('coin_health/', CoinHealthView.as_view(), name='coin_health'),
+            path('add_coin_pair/', AddCoinPairView.as_view(), name='easy_add_pair'),
             path('_clear_cache/', clear_cache, name='clear_cache'),
         ]
         return _urls + urls
@@ -226,3 +230,75 @@ def clear_cache(request):
     referer = request.META.get('HTTP_REFERER', '/')
     messages.add_message(request, messages.SUCCESS, 'Successfully cleared Django cache')
     return redirect(referer)
+
+
+class AddCoinPairView(TemplateView):
+    """
+    Admin view for easily adding two coins + two pairs in each direction
+    """
+    template_name = 'admin/add_pair.html'
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def coin_types(self):
+        """View function to be called from template, for getting list of coin handler errors"""
+        return settings.COIN_TYPES
+
+    def get(self, request, *args, **kwargs):
+        r = self.request
+        u = r.user
+        if not u.is_authenticated or not u.is_superuser:
+            raise PermissionDenied
+        reload_handlers()
+        return super(AddCoinPairView, self).get(request, *args, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        p = request.POST
+        one = dict(
+            symbol=p.get('symbol_one'),
+            symbol_id=p.get('symbol_id_one'),
+            can_issue=is_true(p.get('issue_one')),
+            coin_type=p.get('coin_type_one'),
+            our_account=p.get('our_account_one'),
+            display_name=p.get('display_one'),
+        )
+        two = dict(
+            symbol=p.get('symbol_two'),
+            symbol_id=p.get('symbol_id_two'),
+            can_issue=is_true(p.get('issue_two')),
+            coin_type=p.get('coin_type_two'),
+            our_account=p.get('our_account_two'),
+            display_name=p.get('display_two'),
+        )
+
+        if empty(one['symbol']):
+            messages.add_message(request, messages.ERROR, 'Unique symbol not specified for Coin One.')
+            return redirect('admin:easy_add_pair')
+        if empty(one['coin_type']) or one['coin_type'] not in dict(settings.COIN_TYPES):
+            messages.add_message(request, messages.ERROR, 'Invalid coin type for Coin Two.')
+            return redirect('admin:easy_add_pair')
+        if empty(two['symbol']):
+            messages.add_message(request, messages.ERROR, 'Unique symbol not specified for Coin Two.')
+            return redirect('admin:easy_add_pair')
+        if empty(two['coin_type']) or two['coin_type'] not in dict(settings.COIN_TYPES):
+            messages.add_message(request, messages.ERROR, 'Invalid coin type for Coin Two.')
+            return redirect('admin:easy_add_pair')
+
+        c_one = Coin(**one)
+        c_one.save()
+        messages.add_message(request, messages.SUCCESS, f'Created Coin object {c_one}.')
+
+        c_two = Coin(**two)
+        c_two.save()
+        messages.add_message(request, messages.SUCCESS, f'Created Coin object {c_two}.')
+
+        p_one = CoinPair(from_coin=c_one, to_coin=c_two, exchange_rate=Decimal('1'))
+        p_two = CoinPair(from_coin=c_two, to_coin=c_one, exchange_rate=Decimal('1'))
+        p_one.save()
+        p_two.save()
+        messages.add_message(request, messages.SUCCESS, f'Created CoinPair object {p_one}.')
+        messages.add_message(request, messages.SUCCESS, f'Created CoinPair object {p_two}.')
+
+        return redirect('admin:easy_add_pair')
+

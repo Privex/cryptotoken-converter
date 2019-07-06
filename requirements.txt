@@ -7,6 +7,7 @@ djangorestframework-stubs==0.3.0
 django-filter==2.1.0
 django-cors-headers==2.5.2
 
+privex-helpers>=1.1
 privex-loghelper>=1.0.2
 privex-steemengine>=1.0.1
 privex-jsonrpc>=1.0.1

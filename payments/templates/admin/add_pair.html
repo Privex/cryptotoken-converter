@@ -1,0 +1,128 @@
+{% extends "admin/base_site.html" %}
+{% load i18n cache static %}
+
+{% block extrastyle %}
+    {{ block.super }}
+    <link rel="stylesheet" type="text/css" href="{% static "admin/css/forms.css" %}">
+{% endblock %}
+
+{% block breadcrumbs %}
+    <div class="breadcrumbs">
+        <a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
+        &rsaquo; <a
+            href="">Easy Add Coin Pair</a>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <h1>Easy Add Coin Pair</h1>
+
+
+    <form action="{% url 'admin:easy_add_pair' %}" method="POST"
+    >
+        {% csrf_token %}
+        <hr/>
+        <h1>First Coin</h1>
+        <div class="form-row field-symbol">
+            <div>
+                <label class="required" for="symbol_one">Unique Coin Symbol (for API usage):</label>
+                <input type="text" name="symbol_one" value="" class="vTextField" maxlength="100" required=""
+                       id="symbol_one">
+            </div>
+        </div>
+        <div class="form-row field-symbol">
+            <div>
+                <label for="symbol_id_one">Native Coin Symbol (must be same as network):</label>
+                <input type="text" name="symbol_id_one" value="" class="vTextField" maxlength="100"
+                       id="symbol_id_one">
+            </div>
+        </div>
+        <div class="form-row field-symbol">
+            <div>
+                <label for="display_one">Display Name:</label>
+                <input type="text" name="display_one" value="" class="vTextField" maxlength="100"
+                       id="display_one">
+            </div>
+        </div>
+        <div class="form-row field-symbol">
+            <div>
+                <label for="issue_one">Can Issue:</label>
+                <input type="hidden" name="issue_one" value="no" class="vTextField" maxlength="100" />
+                <input type="checkbox" name="issue_one" value="yes" class="vTextField" maxlength="100"
+                       id="issue_one">
+            </div>
+        </div>
+        <div class="form-row field-symbol">
+            <div>
+                <label class="required" for="coin_type_one">Coin Type:</label>
+                <select name="coin_type_one" id="coin_type_one" required="">
+                    {% for t_id, t_name in view.coin_types %}
+                        <option value="{{ t_id }}">{{ t_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="form-row field-symbol">
+            <div>
+                <label for="our_account_one">Our Account / Address (if required):</label>
+                <input type="text" name="our_account_one" value="" class="vTextField" maxlength="100"
+                       id="our_account_one">
+            </div>
+        </div>
+        <hr/>
+        <!-- ================== -->
+        <h1>Second Coin</h1>
+        <div class="form-row field-symbol">
+            <div>
+                <label class="required" for="symbol_two">Unique Coin Symbol (for API usage):</label>
+                <input type="text" name="symbol_two" value="" class="vTextField" maxlength="100" required=""
+                       id="symbol_two">
+            </div>
+        </div>
+        <div class="form-row field-symbol">
+            <div>
+                <label for="symbol_id_two">Native Coin Symbol (must be same as network):</label>
+                <input type="text" name="symbol_id_two" value="" class="vTextField" maxlength="100"
+                       id="symbol_id_two">
+            </div>
+        </div>
+        <div class="form-row field-symbol">
+            <div>
+                <label for="display_two">Display Name:</label>
+                <input type="text" name="display_two" value="" class="vTextField" maxlength="100"
+                       id="display_two">
+            </div>
+        </div>
+        <div class="form-row field-symbol">
+            <div>
+                <label for="issue_two">Can Issue:</label>
+                <input type="hidden" name="issue_two" value="no" class="vTextField" maxlength="100"/>
+                <input type="checkbox" name="issue_two" value="yes" class="vTextField" maxlength="100"
+                       id="issue_two">
+            </div>
+        </div>
+        <div class="form-row field-symbol">
+            <div>
+                <label class="required" for="coin_type_two">Coin Type:</label>
+                <select name="coin_type_two" id="coin_type_two" required="">
+                    {% for t_id, t_name in view.coin_types %}
+                        <option value="{{ t_id }}">{{ t_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="form-row field-symbol">
+            <div>
+                <label for="our_account_two">Our Account / Address (if required):</label>
+                <input type="text" name="our_account_two" value="" class="vTextField" maxlength="100"
+                       id="our_account_two">
+            </div>
+        </div>
+        <hr/>
+        <br/>
+        <div class="submit-row" style="text-align: left">
+            <input type="submit" name="submit" value="Create Coins and Coin Pairs"/>
+        </div>
+    </form>
+
+{% endblock %}
