@@ -95,14 +95,14 @@ class BatchLoader(BaseLoader, ABC):
         offset = txs_loaded = 0
         while not finished:
             account = coin.our_account if self.need_account else None
-            self.load_batch(symbol=coin.symbol, limit=batch, offset=offset, account=account)
+            self.load_batch(symbol=coin.symbol_id, limit=batch, offset=offset, account=account)
             txs_loaded += len(self.transactions)
             # If there are less remaining TXs than batch size - this usually means we've hit the end of the results.
             # If that happens, or we've hit the transaction limit, then yield the remaining txs and exit.
             if len(self.transactions) < batch or txs_loaded >= self.tx_count:
                 finished = True
             # Convert the transactions to Deposit format (clean_txs is generator, so must iterate it into list)
-            txs = list(self.clean_txs(account=account, symbol=coin.symbol, transactions=self.transactions))
+            txs = list(self.clean_txs(account=account, symbol=coin.symbol_id, transactions=self.transactions))
             del self.transactions  # For RAM optimization, destroy the original transaction list, as it's not needed.
             offset += batch
             for tx in txs:

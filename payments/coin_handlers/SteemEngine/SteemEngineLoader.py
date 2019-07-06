@@ -75,14 +75,14 @@ class SteemEngineLoader(BaseLoader):
         finished = False
         offset = txs_loaded = 0
         while not finished:
-            self.load_batch(account=coin.our_account, symbol=coin.symbol, limit=batch, offset=offset)
+            self.load_batch(account=coin.our_account, symbol=coin.symbol_id, limit=batch, offset=offset)
             txs_loaded += len(self.transactions)
             # If there are less remaining TXs than batch size - this usually means we've hit the end of the results.
             # If that happens, or we've hit the transaction limit, then yield the remaining txs and exit.
             if len(self.transactions) < batch or txs_loaded >= self.tx_count:
                 finished = True
             # Convert the transactions to Deposit format (clean_txs is generator, so must iterate it into list)
-            txs = list(self.clean_txs(account=coin.our_account, symbol=coin.symbol, transactions=self.transactions))
+            txs = list(self.clean_txs(account=coin.our_account, symbol=coin.symbol_id, transactions=self.transactions))
             del self.transactions   # For RAM optimization, destroy the original transaction list, as it's not needed.
             offset += batch
             for tx in txs:
@@ -110,7 +110,7 @@ class SteemEngineLoader(BaseLoader):
                 if type(q) == float:
                     q = ('{0:.' + str(token['precision']) + 'f}').format(tx['quantity'])
                 clean_tx = dict(
-                    txid=tx['txid'], coin=symbol, tx_timestamp=parse(tx['timestamp']),
+                    txid=tx['txid'], coin=self.coins[symbol].symbol, tx_timestamp=parse(tx['timestamp']),
                     from_account=tx['from'], to_account=tx['to'], memo=tx['memo'],
                     amount=Decimal(q)
                 )

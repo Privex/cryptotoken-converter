@@ -126,7 +126,7 @@ class EOSLoader(BaseLoader, EOSMixin):
                 ts = timezone.make_aware(ts, pytz.UTC)
 
                 yield dict(
-                    txid=txid, coin=symbol, tx_timestamp=ts, from_account=tx_data['from'],
+                    txid=txid, coin=self.coins[symbol].symbol, tx_timestamp=ts, from_account=tx_data['from'],
                     to_account=to_acc, memo=memo, amount=Decimal(amount)
                 )
             except Exception:

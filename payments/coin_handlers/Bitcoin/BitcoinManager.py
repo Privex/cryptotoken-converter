@@ -117,7 +117,7 @@ class BitcoinManager(BaseManager, BitcoinMixin):
         # Get all RPCs
         self.rpcs = self._get_rpcs()
         # Manager's only deal with one coin, so unwrap the generated dicts
-        self.rpc = self.rpcs[symbol]           # type: BitcoinRPC
+        self.rpc = self.rpcs[self.coin.symbol_id]   # type: BitcoinRPC
 
     def health_test(self) -> bool:
         """

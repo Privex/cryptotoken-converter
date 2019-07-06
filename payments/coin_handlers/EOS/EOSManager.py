@@ -133,7 +133,7 @@ class EOSManager(BaseManager, EOSMixin):
 
         return {
             'txid': tfr['transaction_id'],
-            'coin': sym,
+            'coin': self.orig_symbol,
             'amount': tx_amt_final,
             'fee': Decimal(0),
             'from': from_address,

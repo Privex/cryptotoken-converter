@@ -67,7 +67,7 @@ class BitcoinMixin:
         if hasattr(self, 'coins'):
             return dict(self.coins)
         elif hasattr(self, 'coin'):
-            return {self.coin.symbol: self.coin}
+            return {self.coin.symbol_id: self.coin}
         raise Exception('Cannot load settings as neither self.coin nor self.coins exists...')
 
     def _prep_settings(self, reset: bool =False) -> Dict[str, dict]:

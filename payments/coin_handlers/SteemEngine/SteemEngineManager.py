@@ -66,7 +66,7 @@ class SteemEngineManager(BaseManager):
     """
 
     def __init__(self, symbol: str):
-        super().__init__(symbol.upper())
+        super().__init__(symbol)
         self.eng_rpc = SteemEngineToken()
 
     def health(self) -> Tuple[str, tuple, tuple]:
@@ -219,7 +219,7 @@ class SteemEngineManager(BaseManager):
                 txid = t['transaction_id']
             return {
                 'txid': txid,
-                'coin': self.symbol,
+                'coin': self.orig_symbol,
                 'amount': amount,
                 'fee': Decimal(0),
                 'from': issuer,
@@ -287,7 +287,7 @@ class SteemEngineManager(BaseManager):
                 txid = t['transaction_id']
             return {
                 'txid': txid,
-                'coin': self.symbol,
+                'coin': self.orig_symbol,
                 'amount': amount,
                 'fee': Decimal(0),
                 'from': from_address,

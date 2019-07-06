@@ -46,9 +46,14 @@ class BaseManager(ABC):
 
     def __init__(self, symbol: str):
         self.log = logging.getLogger(__name__)
-        self.symbol = symbol.upper()
+
         # The Coin object matching the `symbol`
         self.coin = Coin.objects.get(symbol=symbol, enabled=True)
+        self.symbol = self.coin.symbol_id.upper()
+        """The native coin symbol, e.g. BTC, LTC, etc. (non-unique)"""
+
+        self.orig_symbol = self.coin.symbol
+        """The original unique database symbol ID"""
 
     def health(self) -> Tuple[str, tuple, tuple]:
         """

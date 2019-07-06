@@ -139,6 +139,8 @@ class SteemLoader(BaseLoader):
                 t = self.clean_tx(tx, symbol, account)
                 if t is None:
                     continue
+                # Re-write the coin symbol into the database symbol
+                t['coin'] = self.coins[symbol].symbol
                 yield t
             except (AttributeError, KeyError) as e:
                 log.warning('Steem TX missing important key? %s', str(e))

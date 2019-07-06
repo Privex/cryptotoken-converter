@@ -137,7 +137,7 @@ class BitsharesLoader(BaseLoader, BitsharesMixin):
                 tx_datetime = timezone.make_aware(tx_datetime, pytz.UTC)
 
                 clean_tx = dict(
-                    txid=tx['id'], coin=symbol, tx_timestamp=tx_datetime,
+                    txid=tx['id'], coin=self.coins[symbol].symbol, tx_timestamp=tx_datetime,
                     from_account=from_account_name, to_account=account.name, memo=memo_msg,
                     amount=transfer_quantity
                 )

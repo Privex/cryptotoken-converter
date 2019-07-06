@@ -97,9 +97,11 @@ class EOSMixin(SettingsMixin):
             c = {self.coin.symbol: self.coin}
             if self.coin.symbol.upper() != 'EOS':
                 try:
-                    c['EOS'] = Coin.objects.get(symbol='EOS')
+                    c['EOS'] = Coin.objects.get(symbol='EOS', coin_type='eos')
                 except Coin.DoesNotExist:
-                    log.warning('EOSMixin cannot find a coin with the symbol "EOS"...')
+                    log.warning('EOSMixin cannot find a coin with the symbol "EOS" and type "eos"...')
+                    log.warning('Checking for a coin with native symbol_id "EOS" and type "eos"...')
+                    c['EOS'] = Coin.objects.get(symbol_id='EOS', coin_type='eos')
             return c
         raise Exception('Cannot load settings as neither self.coin nor self.coins exists...')
 
@@ -116,6 +118,7 @@ class EOSMixin(SettingsMixin):
     def eos(self) -> Cleos:
         """Returns an instance of Cleos and caches it in the attribute _eos after creation"""
         if not self._eos:
+            log.debug(f'Creating Cleos instance using EOS API node: {self.url}')
             self._eos = Cleos(url=self.url)
         return self._eos
 

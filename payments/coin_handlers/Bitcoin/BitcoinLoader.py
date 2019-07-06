@@ -160,7 +160,7 @@ class BitcoinLoader(BatchLoader, BitcoinMixin):
 
         return dict(
             txid=txid,
-            coin=symbol,
+            coin=self.coins[symbol].symbol,
             vout=int(tx['vout']),
             tx_timestamp=d,
             address=tx['address'],

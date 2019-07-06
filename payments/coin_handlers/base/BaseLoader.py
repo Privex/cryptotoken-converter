@@ -65,12 +65,18 @@ class BaseLoader(ABC):
 
         self.log = logging.getLogger(__name__)
         symbols = self.provides if symbols is None else symbols
+        # List of database symbol IDs (e.g. BTC2, REAL_LTC)
+        self.orig_symbols = symbols
 
         # Pre-load Coin objects, and filter our symbols to only match those that are enabled.
         # self.coins is a dictionary mapping symbols to their Coin objects, for easy lookup.
         # e.g. self.coins['BTC'].display_name
         coins = Coin.objects.filter(symbol__in=symbols, enabled=True)
-        self.coins = {c.symbol: c for c in coins}    # type: Dict[str, Coin]
+        # Coin objects mapped from their native symbol (e.g. BTC/LTC)
+        self.coins = {c.symbol_id: c for c in coins}    # type: Dict[str, Coin]
+        # Coin objects mapped from their database symbol ID (e.g. BTC2, REAL_LTC)
+        self.orig_coins = {c.symbol: c for c in coins}  # type: Dict[str, Coin]
+        # List of native symbols (BTC, LTC, etc.)
         self.symbols = self.coins.keys()
 
         # For your convenience, self.transactions is pre-defined as a list, for loading into by your functions.

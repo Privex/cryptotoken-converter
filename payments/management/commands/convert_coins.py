@@ -264,6 +264,14 @@ class Command(CronLoggerMixin, BaseCommand):
     def __init__(self):
         super(Command, self).__init__()
 
+    def add_arguments(self, parser):
+        # Named (optional) arguments
+        parser.add_argument(
+            '--dry',
+            action='store_true',
+            help="Dry run (don't actually send any coins, just print what would happen)",
+        )
+
     def detect_deposit(self, deposit: Deposit):
         """
         Validates a Deposit through various sanity checks, detects which coin the Deposit is destined for, as well as
@@ -295,7 +303,7 @@ class Command(CronLoggerMixin, BaseCommand):
             log.warning('Marking "inv" - no such coin pair... deposit: "%s"', d)
             raise ConvertInvalid('Deposit is for non-existent coin pair')
 
-    def convert_deposit(self, deposit: Deposit):
+    def convert_deposit(self, deposit: Deposit, dry=False):
         """
         Takes a Deposit in the 'mapped' state (has been through detect_deposit), and attempts to convert it
         to the destination coin.
@@ -315,7 +323,12 @@ class Command(CronLoggerMixin, BaseCommand):
             log.debug('Converting deposit ID %s from %s to %s, coin pair: %s', d.id, d.coin, d.convert_to, pair)
             # Convert() will send the coins, update the Deposit, and create the Conversion object in the DB,
             # as well as some additional validation such as balance checks.
-            return ConvertCore.convert(d, pair, d.convert_dest_address, dest_memo=d.convert_dest_memo)
+            if dry:
+                log.debug(f"DRT RUN: Would run ConvertCore.convert({d}, {pair}, {d.convert_dest_address}, "
+                          f"dest_memo='{d.convert_dest_memo}')")
+                return True
+            else:
+                return ConvertCore.convert(d, pair, d.convert_dest_address, dest_memo=d.convert_dest_memo)
 
         except (CoinPair.DoesNotExist, Coin.DoesNotExist):
             raise ConvertInvalid('Deposit is for non-existent coin pair')
@@ -366,7 +379,7 @@ class Command(CronLoggerMixin, BaseCommand):
                 log.debug('Converting deposit %s', d)
                 with transaction.atomic():
                     try:
-                        self.convert_deposit(d)
+                        self.convert_deposit(d, options['dry'])
                     except ConvertError as e:
                         # Something went very wrong while processing this deposit. Log the error, store the reason
                         # onto the deposit, and then save it.

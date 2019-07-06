@@ -46,7 +46,7 @@ log = logging.getLogger(__name__)
 #
 # If you change it, you'll need to run `./manage.py makemigrations` and `./manage.py migrate`
 #
-SYMBOL_LEN = 20
+SYMBOL_LEN = 30
 # Coin/token amounts are stored in the database with a maximum decimal place precision of the below integer number.
 MAX_STORED_DP = 20
 # Maximum digits possible for coin/token amounts, e.g. 123.456 counts as 6 total digits (3 before dot, 3 after)
@@ -57,8 +57,10 @@ class Coin(models.Model):
     """
     The operator of the service should define all coins and tokens they would like to support using the Django Admin.
     The symbol is used as the primary key, so it must be unique. It will automatically be made uppercase.
+    Native Coin Symbol (e.g. BTC)
     """
-    symbol = models.CharField('Coin Symbol (e.g. BTC)', max_length=SYMBOL_LEN, primary_key=True)
+    symbol = models.CharField('Unique Coin Symbol (for API usage)', max_length=SYMBOL_LEN, primary_key=True)
+    symbol_id = models.CharField('Native Coin Symbol (e.g. BTC)', max_length=SYMBOL_LEN, blank=True)
     display_name = models.CharField('Display Name (e.g. Bitcoin)', max_length=100)
     coin_type = models.CharField(max_length=20)
     # If a coin is disabled (enabled=False), transactions will not be loaded for this coin,
@@ -147,6 +149,8 @@ class Coin(models.Model):
     def save(self, *args, **kwargs):
         """To avoid inconsistency, the symbol is automatically made uppercase"""
         self.symbol = self.symbol.upper()
+        if empty(self.symbol_id):
+            self.symbol_id = self.symbol
         super(Coin, self).save(*args, **kwargs)
         # After a coin is updated in the DB, we should reload any coin_handlers to detect compatible loaders.
         # We need to use in-line loading to prevent recursive loading from the coin handlers causing issues.

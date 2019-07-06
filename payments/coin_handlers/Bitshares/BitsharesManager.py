@@ -339,7 +339,7 @@ class BitsharesManager(BaseManager, BitsharesMixin):
 
         return {
             'txid': None,     # transaction ID is not readily available from the Bitshares API
-            'coin': self.symbol,
+            'coin': self.orig_symbol,
             'amount': self.get_decimal_from_amount(amount_obj),
             'fee': self.get_decimal_from_amount(fee_amount),
             'from': from_address,

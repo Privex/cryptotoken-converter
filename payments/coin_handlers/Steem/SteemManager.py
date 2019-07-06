@@ -303,7 +303,7 @@ class SteemManager(BaseManager):
             return {
                 # There's a risk we can't get the TXID, and so we fall back to None.
                 'txid': tx.get('transaction_id', None),
-                'coin': sym,
+                'coin': self.orig_symbol,
                 'amount': amount,
                 'fee': Decimal(0),
                 'from': from_address,

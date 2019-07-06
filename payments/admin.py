@@ -39,6 +39,7 @@ class CustomAdmin(AdminSite):
     """
     To allow for custom admin views, we override AdminSite, so we can add custom URLs, among other things.
     """
+
     def get_urls(self):
         _urls = super(CustomAdmin, self).get_urls()
         urls = [
@@ -55,6 +56,61 @@ class CoinAdmin(admin.ModelAdmin):
     list_display = ('__str__', 'symbol', 'coin_type', 'enabled', 'our_account', 'can_issue')
     list_filter = ('coin_type',)
     ordering = ('symbol',)
+
+    fieldsets = (
+        ('Unique Coin Symbol for refrencing from the API', {
+            'fields': ('symbol',),
+            'description': "<p><strong>Help:</strong> The 'Unique Coin Symbol' is not passed to the handler, and thus "
+                           "doesn't need to match the real token symbol on the network, it just needs to be unique, as "
+                           "it acts as the ID of the coin when making API calls.</p>"
+                           "</p><br/><hr/>"
+        }),
+        ("Native Token Symbol (must match the real symbol on it's network)", {
+            'fields': ('symbol_id',),
+            'description': "<p>The 'Native Coin Symbol' is passed to the coin handler and does not have to be unique, "
+                           "but it MUST match the real symbol used by the token, otherwise the  "
+                           "coin handler will be unable to send/receive the token.<br/><strong>If you leave this field "
+                           "blank when creating the coin, it will default to the Unique Coin Symbol.</strong>"
+                           "</p><br/><hr/>"
+        }),
+        ('Display name, Coin Type (handler), Enable/Disable coin', {
+            'fields': ('display_name', 'coin_type', 'enabled'),
+            'description': "<p><strong>Help:</strong> The 'Display Name' is returned in API calls, and shown in the"
+                           " admin panel.</p> "
+                           "<p>The 'Coin Type' must be set correctly, it determines which network this coin is on, so "
+                           "that the correct <strong>Coin Handler</strong> will be used for the coin.</p>"
+                           "<p>The 'Enabled' option decides whether or not this coin is in use. If you uncheck this, "
+                           "no conversions will take place for this coin, and it will not be returned on the API."
+                           "</p><hr/>"
+        }),
+        ('Our account/address, and whether we can issue this coin', {
+            'fields': ('our_account', 'can_issue'),
+            'description': "<p><strong>Help:</strong> The 'Our Account (or address)' is passed to the coin handler "
+                           "and may not always need to be specified. For account based networks such as Steem, this "
+                           "setting generally MUST be filled in. <br/> "
+                           "The 'Can Issue' option determines whether the system should attempt to issue a token if "
+                           "our balance is too low to fulfill a conversion. If you are not the issuer of a token, "
+                           "keep this un-ticked.</p><hr/>"
+        }),
+        ('(Advanced) Coin Handler Settings', {
+            'classes': ('collapse',),
+            'fields': ('setting_host', 'setting_port', 'setting_user', 'setting_pass', 'setting_json'),
+            'description': "<p><strong>Help:</strong> The 'Handler Settings' are all optional. Most coins will work "
+                           "just fine without changing any of these options. <br/>"
+                           "The host/port/user/pass settings are designed for selecting a certain RPC node, "
+                           "however these may not always be respected by every handler.<br/> "
+                           "The 'Custom JSON' field allows for additional settings specific to the coin handler, "
+                           "and you must enter valid JSON in this field, for example:</p> "
+                           "<code>{\"contract\": \"eosio.token\"}</code><br/><br/><hr/>"
+        }),
+        ('Low Funds Email Alert Settings', {
+            'classes': ('collapse',),
+            'fields': ('notify_low_funds', 'funds_low', 'last_notified'),
+            'description': "<p><strong>Help:</strong> You generally only need to touch the checkbox 'Send an email"
+                           " notification', as the 'Deposits currently stuck' and 'Last Email Notification' are "
+                           "automatically managed by the system.</p><hr/>"
+        }),
+    )
 
     def get_fieldsets(self, request, obj=None):
         # To ensure that the Coin Type dropdown is properly populated, we call reload_handlers() just before
@@ -128,7 +184,7 @@ class CoinHealthView(TemplateView):
 
     def handler_dic(self):
         """View function to be called from template. Loads and queries coin handlers for health, with caching."""
-        hdic = {}           # A dictionary of {handler_name: {headings:list, results:list[tuple/list]}
+        hdic = {}  # A dictionary of {handler_name: {headings:list, results:list[tuple/list]}
         reload_handlers()
         for coin in Coin.objects.all():
             try:
