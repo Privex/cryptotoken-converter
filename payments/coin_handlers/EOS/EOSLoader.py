@@ -17,7 +17,7 @@ log = logging.getLogger(__name__)
 class EOSLoader(BaseLoader, EOSMixin):
 
     def __init__(self, symbols):
-        super().__init__(symbols=symbols)
+        super(EOSLoader, self).__init__(symbols=symbols)
         self.tx_count = 1000
         self.loaded = False
 
@@ -32,6 +32,8 @@ class EOSLoader(BaseLoader, EOSMixin):
         log.info('Loading EOS transactions...')
 
         self.tx_count = tx_count
+        # This just forces self.settings to be loaded before we loop over self.coins
+        loadsettings = dict(self.settings)
         # Loop over each Coin we're responsible for, make sure every EOS token has both an `our_account` and
         # a contract set (either in Coin.setting_json or EOSMixin.default_contracts). Disable any that don't.
         for symbol, coin in self.coins.items():
@@ -67,7 +69,7 @@ class EOSLoader(BaseLoader, EOSMixin):
 
         for symbol, c in self.coins.items():
             try:
-                sym = c.symbol.upper()
+                sym = c.symbol_id.upper()
                 log.debug(f'Loading EOS actions for token "{sym}", received to "{c.our_account}"')
                 actions = self.get_actions(c.our_account, self.tx_count)
                 yield from self.clean_txs(c.our_account, sym, self.get_contract(sym), actions)

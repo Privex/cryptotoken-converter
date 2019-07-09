@@ -1,7 +1,7 @@
 import logging
 from abc import ABC, abstractmethod
 from decimal import Decimal
-from typing import Tuple
+from typing import Tuple, Union
 
 from django.conf import settings
 
@@ -123,13 +123,14 @@ class BaseManager(ABC):
 
         raise NotImplemented("{}.balance must be implemented!".format(type(self).__name__))
 
-    def issue(self, amount: Decimal, address: str, memo: str = None) -> dict:
+    def issue(self, amount: Decimal, address: str, memo: str = None, trigger_data: Union[dict, list] = None) -> dict:
         """
         Issue (create/print) tokens to a given address/account, optionally specifying a memo if supported
 
         :param Decimal amount:      Amount of tokens to issue, as a Decimal()
         :param address:             Address or account to issue the tokens to
         :param memo:                Memo to issue tokens with (if supported)
+        :param dict trigger_data:   Metadata related to this issue transaction (e.g. the deposit that triggered this)
         :raises IssuerKeyError:     Cannot issue because we don't have authority to (missing key etc.)
         :raises IssueNotSupported:  Class does not support issuing, or requested symbol cannot be issued.
         :raises AccountNotFound: The requested account/address doesn't exist
@@ -152,7 +153,8 @@ class BaseManager(ABC):
         raise exceptions.IssueNotSupported("{} does not support issuing tokens.".format(type(self).__name__))
 
     @abstractmethod
-    def send(self, amount, address, from_address=None, memo=None) -> dict:
+    def send(self, amount: Decimal, address: str, from_address: str = None, memo: str = None,
+             trigger_data: Union[dict, list] = None) -> dict:
         """
         Send tokens to a given address/account, optionally specifying a memo and sender address/account if supported
 
@@ -162,6 +164,7 @@ class BaseManager(ABC):
         :param address:             Address or account to send the coins/tokens to
         :param memo:                Memo to send coins/tokens with (if supported)
         :param from_address:        Address or account to send from (if required)
+        :param dict trigger_data:   Metadata related to this send transaction (e.g. the deposit that triggered this)
         :raises AuthorityMissing:   Cannot send because we don't have authority to (missing key etc.)
         :raises AccountNotFound:    The requested account/address doesn't exist
         :raises NotEnoughBalance:   Sending account/address does not have enough balance to send
@@ -183,7 +186,7 @@ class BaseManager(ABC):
 
         raise NotImplemented("{}.send must be implemented!".format(type(self).__name__))
 
-    def send_or_issue(self, amount, address, memo=None) -> dict:
+    def send_or_issue(self, amount, address, memo=None, trigger_data: Union[dict, list] = None) -> dict:
         """
         Attempt to send an amount to an address/account, if not enough balance, attempt to issue it instead.
         You may override this method if needed.
@@ -191,6 +194,7 @@ class BaseManager(ABC):
         :param Decimal amount:      Amount of coins/tokens to send/issue, as a Decimal()
         :param address:             Address or account to send/issue the coins/tokens to
         :param memo:                Memo to send/issue coins/tokens with (if supported)
+        :param dict trigger_data:   Metadata related to this issue transaction (e.g. the deposit that triggered this)
         :raises IssuerKeyError:     Cannot issue because we don't have authority to (missing key etc.)
         :raises IssueNotSupported:  Class does not support issuing, or requested symbol cannot be issued.
         :raises AccountNotFound: The requested account/address doesn't exist
@@ -211,9 +215,9 @@ class BaseManager(ABC):
         """
 
         try:
-            return self.send(amount=amount, address=address, memo=memo)
+            return self.send(amount=amount, address=address, memo=memo, trigger_data=trigger_data)
         except exceptions.NotEnoughBalance:
-            return self.issue(amount=amount, address=address, memo=memo)
+            return self.issue(amount=amount, address=address, memo=memo, trigger_data=trigger_data)
 
 
 

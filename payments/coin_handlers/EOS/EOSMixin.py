@@ -92,16 +92,16 @@ class EOSMixin(SettingsMixin):
         """
 
         if hasattr(self, 'coins'):
-            return dict(self.coins)
+            c = dict(self.coins)
         elif hasattr(self, 'coin'):
-            c = {self.coin.symbol: self.coin}
-            if self.coin.symbol.upper() != 'EOS':
-                try:
-                    c['EOS'] = Coin.objects.get(symbol='EOS', coin_type='eos')
-                except Coin.DoesNotExist:
-                    log.warning('EOSMixin cannot find a coin with the symbol "EOS" and type "eos"...')
-                    log.warning('Checking for a coin with native symbol_id "EOS" and type "eos"...')
-                    c['EOS'] = Coin.objects.get(symbol_id='EOS', coin_type='eos')
+            c = {self.coin.symbol_id: self.coin}
+        if 'EOS' not in c:
+            try:
+                c['EOS'] = Coin.objects.get(symbol='EOS', coin_type='eos')
+            except Coin.DoesNotExist:
+                log.warning('EOSMixin cannot find a coin with the symbol "EOS" and type "eos"...')
+                log.warning('Checking for a coin with native symbol_id "EOS" and type "eos"...')
+                c['EOS'] = Coin.objects.get(symbol_id='EOS', coin_type='eos')
             return c
         raise Exception('Cannot load settings as neither self.coin nor self.coins exists...')
 

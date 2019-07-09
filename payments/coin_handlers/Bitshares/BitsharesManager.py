@@ -197,7 +197,7 @@ class BitsharesManager(BaseManager, BitsharesMixin):
             return False
         return True
 
-    def issue(self, amount: Decimal, address: str, memo: str = None) -> dict:
+    def issue(self, amount: Decimal, address: str, memo: str = None, trigger_data=None) -> dict:
         """
         Issuing tokens is not supported for the initial release of the Bitshares coin handler. This function
         will throw a IssueNotSupported exception if it is called.
@@ -215,7 +215,7 @@ class BitsharesManager(BaseManager, BitsharesMixin):
             return False
         return True
 
-    def send(self, amount, address, memo=None, from_address=None) -> dict:
+    def send(self, amount, address, memo=None, from_address=None, trigger_data=None) -> dict:
         """
         Send tokens to a given address/account, optionally specifying a memo. The Bitshares network transaction fee
         will be subtracted from the amount before sending.
@@ -346,23 +346,24 @@ class BitsharesManager(BaseManager, BitsharesMixin):
             'send_type': 'send'
         }
 
-    def send_or_issue(self, amount, address, memo=None) -> dict:
+    def send_or_issue(self, amount, address, memo=None, trigger_data=None) -> dict:
         """
         Issuing tokens is not supported for the initial release of the Bitshares coin handler. This function
         should not be used until such support has been added.
         """
         try:
             log.debug(f'Attempting to send {amount} {self.symbol} to {address} ...')
-            return self.send(amount=amount, address=address, memo=memo)
+            return self.send(amount=amount, address=address, memo=memo, trigger_data=trigger_data)
         except exceptions.NotEnoughBalance:
             acc = self.coin.our_account
             log.debug(f'Not enough balance. Issuing {amount} {self.symbol} to our account {acc} ...')
 
             # Issue the coins to our own account, and then send them.
-            self.issue(amount=amount, address=acc, memo=f"Issuing to self before transfer to {address}")
+            self.issue(amount=amount, address=acc,
+                       memo=f"Issuing to self before transfer to {address}", trigger_data=trigger_data)
 
             log.debug(f'Sending newly issued coins: {amount} {self.symbol} to {address} ...')
-            tx = self.send(amount=amount, address=address, memo=memo, from_address=acc)
+            tx = self.send(amount=amount, address=address, memo=memo, from_address=acc, trigger_data=trigger_data)
             # So the calling function knows we had to issue these coins, we change the send_type back to 'issue'
             tx['send_type'] = 'issue'
             return tx

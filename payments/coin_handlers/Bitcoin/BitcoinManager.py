@@ -175,7 +175,7 @@ class BitcoinManager(BaseManager, BitcoinMixin):
 
         return 'address', self.rpc.getnewaddress()
 
-    def send(self, amount, address, memo=None, from_address=None) -> dict:
+    def send(self, amount, address, memo=None, from_address=None, trigger_data=None) -> dict:
         """
         Send the amount `amount` of `self.symbol` to a given address.
 

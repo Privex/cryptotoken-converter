@@ -15,8 +15,9 @@ Copyright::
         +===================================================+
 """
 import logging
+from collections import namedtuple
 from decimal import Decimal
-from typing import Tuple
+from typing import Tuple, Union
 
 from django.conf import settings
 from django.core.mail import mail_admins
@@ -24,8 +25,10 @@ from django.core.management import BaseCommand
 from django.db import transaction
 from django.template.loader import render_to_string
 from django.utils import timezone
+from privex.helpers import is_true
 
 from payments.coin_handlers import get_manager
+from payments.coin_handlers.base import SettingsMixin
 from payments.coin_handlers.base.exceptions import NotEnoughBalance, AccountNotFound
 from payments.management import CronLoggerMixin
 from payments.models import Deposit, Coin, CoinPair, Conversion, AddressAccountMap
@@ -117,6 +120,58 @@ class ConvertCore:
         raise ConvertInvalid('No deposit address nor memo - unable to route this deposit anywhere...')
 
     @staticmethod
+    def refund_sender(deposit: Deposit, reason: str = None, return_to: str = None) -> Tuple[Deposit, dict]:
+        """
+        Returns a Deposit back to it's original sender, sets the Deposit status to 'refund', and stores the refund
+        details onto the Deposit.
+
+        :param Deposit    deposit: The :class:`models.Deposit` object to refund
+        :param str         reason: If specified, will use this instead of ``deposit.error_reason`` for the memo.
+        :param str      return_to: If specified, will return to this addr/acc instead of deposit.address/from_account
+        :return tuple refund_data:  Returns a tuple containing the updated Deposit object, and the tx data from send().
+        """
+        d = deposit
+        reason = d.error_reason if empty(reason) else reason
+        if empty(reason):
+            reason = f'Returned to sender due to unknown error processing deposit amount {d.amount} ' \
+                f'with TXID {d.txid}...'
+
+        log.info(f'Refunding Deposit {d} due to reason: {reason}')
+        if d.status == 'refund':
+            raise ConvertError(f'The deposit {d} is already refunded!')
+        if d.status == 'conv':
+            raise ConvertError(f'The deposit {d} is already successfully converted!')
+
+        c = d.coin
+        sym = c.symbol.upper()
+        mgr = get_manager(sym)
+        # Return destination priority: ``return_to`` arg, sender address, sender account
+        dest = d.address if empty(return_to) else return_to
+        dest = d.from_account if empty(dest) else dest
+
+        if empty(dest):
+            raise AttributeError('refund_sender could not find any non-empty return address/account...')
+
+        metadata = dict(deposit=deposit, action="refund")
+        log.info(f'(REFUND) Sending {d.amount} {sym} to addr/acc {dest} with memo "{reason}"')
+
+        txdata = mgr.send_or_issue(amount=d.amount, address=dest, memo=reason, trigger_data=metadata)
+        log.debug(f'(REFUND) Storing refund details for deposit {d}')
+
+        d.status = 'refund'
+        d.refund_address = dest
+        d.refund_amount = txdata['amount']
+        d.refund_coin = sym
+        d.refund_memo = reason
+        d.refund_txid = txdata['txid']
+        d.refunded_at = timezone.now()
+
+        d.save()
+        log.info(f'(REFUND) SUCCESS. Saved details for {d}')
+
+        return d, txdata
+
+    @staticmethod
     def convert(deposit: Deposit, pair: CoinPair, address: str, dest_memo: str = None):
         """
         After a Deposit has passed the validation checks of :py:meth:`.detect_deposit` , this method loads the
@@ -159,10 +214,15 @@ class ConvertCore:
                 deposit.last_convert_attempt = timezone.now()
                 deposit.save()
                 return None
+            metadata = dict(
+                deposit=deposit,
+                pair=pair,
+                action="convert"
+            )
             if tcoin.can_issue:
-                s = mgr.send_or_issue(amount=send_amount, address=address, memo=dest_memo)
+                s = mgr.send_or_issue(amount=send_amount, address=address, memo=dest_memo, trigger_data=metadata)
             else:
-                s = mgr.send(amount=send_amount, address=address, memo=dest_memo)
+                s = mgr.send(amount=send_amount, address=address, memo=dest_memo, trigger_data=metadata)
             log.info('Successfully sent %f %s to address/account %s', send_amount, dest_coin, address)
 
             deposit.status = 'conv'
@@ -352,9 +412,21 @@ class Command(CronLoggerMixin, BaseCommand):
                         # Something went very wrong while processing this deposit. Log the error, store the reason
                         # onto the deposit, and then save it.
                         log.error('ConvertError while validating deposit "%s" !!! Message: %s', d, str(e))
-                        d.status = 'err'
-                        d.error_reason = str(e)
-                        d.save()
+                        try:
+                            mgr = get_manager(d.coin.symbol) # type: SettingsMixin
+                            auto_refund = mgr.settings.get(d.coin.symbol, {}).get('auto_refund', False)
+                            if is_true(auto_refund):
+                                log.info(f'Auto refund is enabled for coin {d.coin}. Attempting return to sender.')
+                                ConvertCore.refund_sender(deposit=d)
+                            else:
+                                d.status = 'err'
+                                d.error_reason = str(e)
+                                d.save()
+                        except Exception as e:
+                            log.exception('An exception occurred while checking if auto_refund was enabled...')
+                            d.status = 'err'
+                            d.error_reason = f'Auto refund failure: {str(e)}'
+                            d.save()
                     except ConvertInvalid as e:
                         # This exception usually means the sender didn't read the instructions properly, or simply
                         # that the transaction wasn't intended to be exchanged.

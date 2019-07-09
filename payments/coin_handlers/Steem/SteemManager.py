@@ -223,7 +223,7 @@ class SteemManager(BaseManager):
                     return tx
         return None
 
-    def send(self, amount: Decimal, address: str, from_address: str = None, memo: str = None) -> dict:
+    def send(self, amount: Decimal, address: str, from_address: str = None, memo=None, trigger_data=None) -> dict:
         """
         Send a supported currency to a given address/account, optionally specifying a memo if supported
 

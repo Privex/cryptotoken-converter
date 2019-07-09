@@ -67,7 +67,7 @@ class SteemLoader(BaseLoader):
 
     def __init__(self, symbols):
         super(SteemLoader, self).__init__(symbols=symbols)
-        self.tx_count = 10000
+        self.tx_count = 100
         self.loaded = False
         self.rpc = shared_steem_instance()
 

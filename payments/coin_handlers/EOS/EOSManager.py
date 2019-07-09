@@ -85,7 +85,7 @@ class EOSManager(BaseManager, EOSMixin):
 
         return amt
 
-    def send(self, amount, address, from_address=None, memo=None) -> dict:
+    def send(self, amount, address, from_address=None, memo=None, trigger_data=None) -> dict:
         """
         Send a given ``amount`` of EOS (or a token on EOS) from ``from_address`` to ``address`` with the memo ``memo``.
 
@@ -175,6 +175,7 @@ class EOSManager(BaseManager, EOSMixin):
         tx_bin = self.eos.abi_json_to_bin(payload['account'], payload['name'], tx_args)
         payload['data'] = tx_bin['binargs']
         trx = dict(actions=[payload])
+        log.debug(f'Full EOS payload: {trx} Tx Bin: {tx_bin}')
         trx['expiration'] = str((datetime.utcnow() + timedelta(seconds=60)).replace(tzinfo=pytz.UTC))
         # Sign and broadcast the transaction we've just built
         tfr = self.eos.push_transaction(trx, priv_key, broadcast=broadcast)
@@ -260,7 +261,7 @@ class EOSManager(BaseManager, EOSMixin):
 
         return amount
 
-    def issue(self, amount: Decimal, address: str, memo: str = None):
+    def issue(self, amount: Decimal, address: str, memo: str = None, trigger_data=None):
         acc = self.coin.our_account
 
         # Some basic sanity checks, e.g. do the from/to account exist? validate/cast the sending amount
@@ -289,20 +290,23 @@ class EOSManager(BaseManager, EOSMixin):
             'send_type': 'issue'
         }
 
-    def send_or_issue(self, amount, address, memo=None) -> dict:
+    def send_or_issue(self, amount, address, memo=None, trigger_data=None) -> dict:
         try:
             log.debug(f'Attempting to send {amount} {self.symbol} to {address} ...')
-            return self.send(amount=amount, address=address, memo=memo)
+            return self.send(amount=amount, address=address, memo=memo, trigger_data=trigger_data)
         except NotEnoughBalance:
             acc = self.coin.our_account
             log.debug(f'Not enough balance. Issuing {amount} {self.symbol} to our account {acc} ...')
 
             # Issue the coins to our own account, and then send them. This prevents problems caused when issuing
             # directly to third parties.
-            self.issue(amount=amount, address=acc, memo=f"Issuing to self before transfer to {address}")
+            self.issue(
+                amount=amount, address=acc, memo=f"Issuing to self before transfer to {address}",
+                trigger_data=trigger_data
+            )
 
             log.debug(f'Sending newly issued coins: {amount} {self.symbol} to {address} ...')
-            tx = self.send(amount=amount, address=address, memo=memo, from_address=acc)
+            tx = self.send(amount=amount, address=address, memo=memo, from_address=acc, trigger_data=trigger_data)
             # So the calling function knows we had to issue these coins, we change the send_type back to 'issue'
             tx['send_type'] = 'issue'
             return tx

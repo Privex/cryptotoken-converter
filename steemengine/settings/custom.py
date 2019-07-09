@@ -43,6 +43,7 @@ from getenv import env
 #########
 # Steem Network related settings
 ####
+from privex.helpers import env_csv
 
 STEEM_RPC_NODES = env('STEEM_RPC_NODES', None)
 # Supply a list of one or more comma-separated Steem RPC nodes. If not set, will use the default beem nodes.
@@ -80,7 +81,14 @@ COIN_TYPES = (
 # Load coin handlers from this absolute module path
 COIN_HANDLERS_BASE = env('COIN_HANDLERS_BASE', 'payments.coin_handlers')
 # A comma separated list of modules to load
-COIN_HANDLERS = env('COIN_HANDLERS', 'SteemEngine,Bitcoin,Steem,EOS,Bitshares').split(',')
+COIN_HANDLERS = env_csv('COIN_HANDLERS', [
+    'SteemEngine',
+    'Bitcoin',
+    'Steem',
+    'EOS',
+    'Bitshares',
+    'Appics',
+])
 
 # After the first email to inform admins a wallet is low, how long before we send out a second notification?
 # (in hours) (Default: 12 hrs)
