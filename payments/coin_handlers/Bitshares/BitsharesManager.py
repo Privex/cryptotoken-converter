@@ -199,10 +199,93 @@ class BitsharesManager(BaseManager, BitsharesMixin):
 
     def issue(self, amount: Decimal, address: str, memo: str = None) -> dict:
         """
-        Issuing tokens is not supported for the initial release of the Bitshares coin handler. This function
-        will throw a IssueNotSupported exception if it is called.
+        Issue (create/print) tokens to a given address/account, optionally specifying a memo if desired.
+        The network transaction fee for issuance will be paid by the issuing account in BTS.
+
+        Example - Issue 5.10 SGTK to @privex
+
+            >>> s = BitsharesManager('SGTK')
+            >>> s.issue(address='privex', amount=Decimal('5.10'))
+
+        :param Decimal amount:      Amount of tokens to issue, as a Decimal
+        :param address:             Account to issue the tokens to (which is also the issuer account)
+        :param memo:                Optional memo for the issuance transaction
+        :raises IssuerKeyError:     Cannot issue because we don't have authority to (missing key etc.)
+        :raises TokenNotFound:      When the requested token `symbol` does not exist
+        :raises AccountNotFound:    The requested account doesn't exist
+        :raises ArithmeticError:    When the amount is lower than the lowest amount allowed by the token's precision
+        :return dict: Result Information
+
+        Format::
+
+          {
+              txid:str - Transaction ID - None if not known,
+              coin:str - Symbol that was sent,
+              amount:Decimal - The amount that was issued,
+              fee:Decimal    - TX Fee that was taken from the amount (will be 0 if fee is in BTS rather than the issuing token),
+              from:str       - The account/address the coins were issued from,
+              send_type:str       - Should be statically set to "issue"
+          }
+
         """
-        raise exceptions.IssueNotSupported("{} does not support issuing tokens.".format(type(self).__name__))
+        asset_obj = self.get_asset_obj(self.symbol)
+        if asset_obj is None:
+            raise exceptions.TokenNotFound(f'Failed to issue because {self.symbol} is an invalid token symbol.')
+
+        # trim input amount to the token's precision just to be safe
+        str_amount = ('{0:.' + str(asset_obj['precision']) + 'f}').format(amount)
+        amount = Decimal(str_amount)
+
+        if not self.is_amount_above_minimum(amount, asset_obj['precision']):
+            raise ArithmeticError(f'Failed to issue because {amount} is less than the minimum amount allowed for {self.symbol} tokens.')
+
+        to_account = self.get_account_obj(address)
+        if to_account is None:
+            raise exceptions.AccountNotFound(f'Failed to issue because issuing account {address} could not be found.')
+
+        amount_obj = Amount(str_amount, self.symbol, blockchain_instance=self.bitshares)
+
+        try:
+            # make sure we have the necessary private keys loaded (memo key for encrypting memo, active key for issuing coins)
+            self.set_wallet_keys(address, [ 'memo', 'active' ])
+
+            if memo is None:
+                memo = ''
+            memo_obj = Memo(from_account=to_account, to_account=to_account, blockchain_instance=self.bitshares)
+            encrypted_memo = memo_obj.encrypt(memo)
+
+            # construct the transaction - note that transaction fee for issuance will be paid in BTS, but we retain the
+            # flexibility to add support for paying the fee in the issuing token if deemed necessary
+            op = operations.Asset_issue(
+                **{
+                    "fee": {"amount": 0, "asset_id": "1.3.0"},
+                    "issuer": to_account["id"],
+                    "asset_to_issue": {"amount": int(amount_obj), "asset_id": amount_obj.asset["id"]},
+                    "memo": encrypted_memo,
+                    "issue_to_account": to_account["id"],
+                    "extensions": [],
+                    "prefix": self.bitshares.prefix,
+                }
+            )
+
+            log.debug('doing token issuance - address[%s], amount[%s %s], memo[%s]', address, str_amount, self.symbol, memo)
+
+            # broadcast the transaction
+            self.bitshares.finalizeOp(op, to_account, "active")
+            result = self.bitshares.broadcast()
+        except KeyNotFound as e:
+            raise exceptions.IssuerKeyError(str(e))
+        except exceptions.AuthorityMissing as e:
+            raise exceptions.IssuerKeyError(str(e))
+
+        return {
+            'txid': None,     # transaction ID is not readily available from the Bitshares API
+            'coin': self.orig_symbol,
+            'amount': self.get_decimal_from_amount(amount_obj),
+            'fee': Decimal(0),     # fee is in BTS, not the issuing token
+            'from': address,
+            'send_type': 'issue'
+        }
 
     def is_amount_above_minimum(self, amount: Decimal, precision: int) -> bool:
         """
@@ -348,8 +431,13 @@ class BitsharesManager(BaseManager, BitsharesMixin):
 
     def send_or_issue(self, amount, address, memo=None) -> dict:
         """
-        Issuing tokens is not supported for the initial release of the Bitshares coin handler. This function
-        should not be used until such support has been added.
+        Send tokens to a given account, optionally specifying a memo. If the balance of the
+        sending account is too low, try to issue new tokens to ourself first. See documentation
+        for the :func:`BitsharesManager.BitsharesManager.send` and
+        :func:`BitsharesManager.BitsharesManager.issue` functions for more details.
+
+        send_type in the returned dict will be either 'send' or 'issue' depending on the operation
+        performed
         """
         try:
             log.debug(f'Attempting to send {amount} {self.symbol} to {address} ...')
