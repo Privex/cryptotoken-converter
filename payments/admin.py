@@ -151,7 +151,7 @@ class DepositAdmin(admin.ModelAdmin):
 
 
 class KeyPairAdmin(admin.ModelAdmin):
-    list_display = ('network', 'public_key', 'account')
+    list_display = ('network', 'public_key', 'account', 'key_type')
     ordering = ('network', 'account')
 
 
