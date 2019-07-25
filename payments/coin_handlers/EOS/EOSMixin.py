@@ -109,6 +109,17 @@ class EOSMixin(SettingsMixin):
         return c
 
     @property
+    def settings(self) -> Dict[str, dict]:
+        """
+        Get all settings, mapped by coin symbol (each coin symbol dict contains custom json settings merged)
+
+        :return dict settings: A dictionary mapping coin symbols to settings
+        """
+        if len(self._settings) > 0:
+            return self._settings
+        return self._prep_settings()
+
+    @property
     def eos_settings(self) -> Dict[str, Any]:
         """
         Since EOS deals with tokens under one network, this is a helper property to quickly get the base EOS settings
