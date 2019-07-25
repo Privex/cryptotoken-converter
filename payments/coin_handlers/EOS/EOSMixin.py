@@ -106,6 +106,7 @@ class EOSMixin(SettingsMixin):
                 log.warning('Checking for a coin with native symbol_id "EOS" and type "eos"...')
                 c['EOS'] = Coin.objects.get(symbol_id='EOS', coin_type='eos')
             return c
+        return c
 
     @property
     def eos_settings(self) -> Dict[str, Any]:
