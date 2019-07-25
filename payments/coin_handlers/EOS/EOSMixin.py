@@ -90,11 +90,14 @@ class EOSMixin(SettingsMixin):
 
         :return dict coins: A dict<str,Coin> of supported coins, mapped by symbol
         """
-
+        c = {}
         if hasattr(self, 'coins'):
             c = dict(self.coins)
         elif hasattr(self, 'coin'):
             c = {self.coin.symbol_id: self.coin}
+        else:
+            raise Exception('Cannot load settings as neither self.coin nor self.coins exists...')
+
         if 'EOS' not in c:
             try:
                 c['EOS'] = Coin.objects.get(symbol='EOS', coin_type='eos')
@@ -103,7 +106,6 @@ class EOSMixin(SettingsMixin):
                 log.warning('Checking for a coin with native symbol_id "EOS" and type "eos"...')
                 c['EOS'] = Coin.objects.get(symbol_id='EOS', coin_type='eos')
             return c
-        raise Exception('Cannot load settings as neither self.coin nor self.coins exists...')
 
     @property
     def eos_settings(self) -> Dict[str, Any]:
