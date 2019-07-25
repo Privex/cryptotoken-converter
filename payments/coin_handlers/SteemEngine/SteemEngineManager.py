@@ -94,6 +94,7 @@ class SteemEngineManager(BaseManager):
             tk = rpc.get_token(self.symbol)
             if empty(tk, itr=True):
                 raise exceptions.TokenNotFound('Token data was empty')
+            tk = dict(tk)
             issuer = tk.get('issuer', 'ERROR GETTING ISSUER')
             token_name = tk.get('name', 'ERROR GETTING NAME')
             precision = str(tk.get('precision', 'ERROR GETTING PRECISION'))
