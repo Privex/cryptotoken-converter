@@ -22,19 +22,18 @@ from typing import Dict, List, Iterable, Generator, Union
 import pytz
 from beem.account import Account
 from beem.asset import Asset
-from beem.steem import Steem
-from beem.instance import shared_steem_instance
 from dateutil.parser import parse
 from django.utils import timezone
 
 from payments.coin_handlers import BaseLoader
+from payments.coin_handlers.Steem.SteemMixin import SteemMixin
 from steemengine.helpers import empty
 
 log = logging.getLogger(__name__)
 getcontext().rounding = ROUND_DOWN
 
 
-class SteemLoader(BaseLoader):
+class SteemLoader(BaseLoader, SteemMixin):
     """
     SteemLoader - Loads transactions from the Steem network
 
@@ -72,17 +71,6 @@ class SteemLoader(BaseLoader):
         self._rpc = None
 
     @property
-    def rpc(self) -> Steem:
-        if not self._rpc:
-            settings = self.settings[self.symbols[0]]['json']
-            rpcs = settings.get('rpcs')
-            # If you've specified custom RPC nodes in the custom JSON, make a new instance with those
-            # Otherwise, use the global shared_steem_instance.
-            self._rpc = shared_steem_instance() if empty(rpcs, itr=True) else Steem(rpcs)  # type: Steem
-            self._rpc.set_password_storage(settings.get('pass_store', 'environment'))
-        return self._rpc
-
-    @property
     def settings(self) -> Dict[str, dict]:
         """To ensure we always get fresh settings from the DB after a reload"""
         return dict(((sym, c.settings) for sym, c in self.coins.items()))
@@ -97,19 +85,6 @@ class SteemLoader(BaseLoader):
             log.warning('The coin %s does not have `our_account` set. Refusing to load transactions.', coin)
             del self.coins[symbol]
             self.symbols = [s for s in self.symbols if s != symbol]
-
-    def get_rpc(self, symbol):
-        """
-        Returns a Steem instance for querying data and sending TXs. By default, uses the Beem shared_steem_instance.
-
-        If a custom RPC list is specified in the Coin "custom json" settings, a new instance will be returned with the
-        RPCs specified in the json.
-
-        :param symbol: Coin symbol to get Beem RPC instance for
-        :return beem.steem.Steem: An instance of :class:`beem.steem.Steem` for querying
-        """
-        rpc_list = self.settings[symbol]['json'].get('rpcs')
-        return self.rpc if empty(rpc_list, itr=True) else Steem(node=rpc_list)
 
     def list_txs(self, batch=0) -> Generator[dict, None, None]:
         if not self.loaded:

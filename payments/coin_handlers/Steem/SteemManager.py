@@ -20,14 +20,11 @@ from decimal import Decimal, getcontext, ROUND_DOWN
 from typing import Tuple, List
 
 from beem.account import Account
-from beem.asset import Asset
-from beem.blockchain import Blockchain
 from beem.exceptions import AccountDoesNotExistsException, MissingKeyError
-from beem.steem import Steem
-from beem.instance import shared_steem_instance
 
 from payments.coin_handlers import BaseManager
 from payments.coin_handlers.Steem.SteemLoader import SteemLoader
+from payments.coin_handlers.Steem.SteemMixin import SteemMixin
 from payments.coin_handlers.base import exceptions
 from steemengine.helpers import empty
 
@@ -35,7 +32,7 @@ log = logging.getLogger(__name__)
 getcontext().rounding = ROUND_DOWN
 
 
-class SteemManager(BaseManager):
+class SteemManager(BaseManager, SteemMixin):
     """
     This class handles various operations for the **Steem** network, and supports both STEEM and SBD.
 
@@ -72,37 +69,9 @@ class SteemManager(BaseManager):
     """
 
     def __init__(self, symbol: str):
-        super().__init__(symbol)
-
-        self._rpc = None
-
-        # Internal storage variables for the properties ``asset`` and ``precisions``
-        self._asset = self._precision = None
-
-    @property
-    def rpc(self) -> Steem:
-        if not self._rpc:
-            settings = self.coin.settings['json']
-            rpcs = settings.get('rpcs')
-            # If you've specified custom RPC nodes in the custom JSON, make a new instance with those
-            # Otherwise, use the global shared_steem_instance.
-            self._rpc = shared_steem_instance() if empty(rpcs, itr=True) else Steem(rpcs)  # type: Steem
-            self._rpc.set_password_storage(settings.get('pass_store', 'environment'))
-        return self._rpc
-
-    @property
-    def asset(self) -> Asset:
-        """Easy reference to the Beem Asset object for our current symbol"""
-        if not self._asset:
-            self._asset = Asset(self.symbol, steem_instance=self.rpc)
-        return self._asset
-
-    @property
-    def precision(self) -> int:
-        """Easy reference to the precision for our current symbol"""
-        if not self._precision:
-            self._precision = int(self.asset.precision)
-        return self._precision
+        super(SteemManager, self).__init__(symbol)
+        self._rpc = self._asset = self._precision = None
+        self._rpcs = {}
 
     def health(self) -> Tuple[str, tuple, tuple]:
         """
@@ -209,26 +178,6 @@ class SteemManager(BaseManager):
 
         bal = acc.get_balance('available', self.symbol)
         return Decimal(bal.amount)
-
-    def find_steem_tx(self, tx_data, last_blocks=15):
-        """
-        Used internally to get the transaction ID after a transaction has been broadcasted
-
-        :param dict tx_data:      Transaction data returned by a beem broadcast operation, must include 'signatures'
-        :param int last_blocks:   Amount of previous blocks to search for the transaction
-        :return dict:             Transaction data from the blockchain {transaction_id, ref_block_num, ref_block_prefix,
-                                  expiration, operations, extensions, signatures, block_num, transaction_num}
-
-        :return None:             If the transaction wasn't found, None will be returned.
-        """
-        # Code taken/based from @holgern/beem blockchain.py
-        chain = Blockchain(steem_instance=self.rpc, mode='head')
-        current_num = chain.get_current_block_num()
-        for block in chain.blocks(start=current_num - last_blocks, stop=current_num + 5):
-            for tx in block.transactions:
-                if sorted(tx["signatures"]) == sorted(tx_data["signatures"]):
-                    return tx
-        return None
 
     def send(self, amount: Decimal, address: str, from_address: str = None, memo=None, trigger_data=None) -> dict:
         """
