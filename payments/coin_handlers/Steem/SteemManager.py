@@ -73,15 +73,22 @@ class SteemManager(BaseManager):
 
     def __init__(self, symbol: str):
         super().__init__(symbol)
-        settings = self.coin.settings['json']
 
-        rpcs = settings.get('rpcs')
-        # If you've specified custom RPC nodes in the custom JSON, make a new instance with those
-        # Otherwise, use the global shared_steem_instance.
-        self.rpc = shared_steem_instance() if empty(rpcs, itr=True) else Steem(rpcs)  # type: Steem
-        self.rpc.set_password_storage(settings.get('pass_store', 'environment'))
+        self._rpc = None
+
         # Internal storage variables for the properties ``asset`` and ``precisions``
         self._asset = self._precision = None
+
+    @property
+    def rpc(self) -> Steem:
+        if not self._rpc:
+            settings = self.coin.settings['json']
+            rpcs = settings.get('rpcs')
+            # If you've specified custom RPC nodes in the custom JSON, make a new instance with those
+            # Otherwise, use the global shared_steem_instance.
+            self._rpc = shared_steem_instance() if empty(rpcs, itr=True) else Steem(rpcs)  # type: Steem
+            self._rpc.set_password_storage(settings.get('pass_store', 'environment'))
+        return self._rpc
 
     @property
     def asset(self) -> Asset:

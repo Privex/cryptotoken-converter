@@ -69,7 +69,18 @@ class SteemLoader(BaseLoader):
         super(SteemLoader, self).__init__(symbols=symbols)
         self.tx_count = 100
         self.loaded = False
-        self.rpc = shared_steem_instance()
+        self._rpc = None
+
+    @property
+    def rpc(self) -> Steem:
+        if not self._rpc:
+            settings = self.settings[self.symbols[0]]['json']
+            rpcs = settings.get('rpcs')
+            # If you've specified custom RPC nodes in the custom JSON, make a new instance with those
+            # Otherwise, use the global shared_steem_instance.
+            self._rpc = shared_steem_instance() if empty(rpcs, itr=True) else Steem(rpcs)  # type: Steem
+            self._rpc.set_password_storage(settings.get('pass_store', 'environment'))
+        return self._rpc
 
     @property
     def settings(self) -> Dict[str, dict]:
