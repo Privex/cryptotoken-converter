@@ -124,7 +124,7 @@ class EOSManager(BaseManager, EOSMixin):
         sym, contract = self.symbol, self.get_contract(self.symbol)
 
         # Craft the transaction arguments for the transfer operation, then broadcast it and get the result
-        precision = self.settings.get('precision', 4)
+        precision = self.settings[self.symbol].get('precision', 4)
         amt = f"{amount:.{precision}f} {sym}"
         tx_args = {"from": from_address, "to": address, "quantity": amt, "memo": memo}
         tfr = self.build_tx("transfer", contract, from_address, tx_args)
@@ -276,7 +276,7 @@ class EOSManager(BaseManager, EOSMixin):
         sym, contract = self.symbol, self.get_contract(self.symbol)
 
         # Craft the transaction arguments for the issue operation, then broadcast it and get the result
-        precision = self.settings.get('precision', 4)
+        precision = self.settings[self.symbol].get('precision', 4)
         amt = f"{amount:.{precision}f} {sym}"
         tx_args = {"to": address, "quantity": amt, "memo": memo}
         tfr = self.build_tx("issue", contract, acc, tx_args)
