@@ -69,6 +69,7 @@ class SteemLoader(BaseLoader, SteemMixin):
         self.tx_count = 100
         self.loaded = False
         self._rpc = None
+        self._rpcs = {}
 
     @property
     def settings(self) -> Dict[str, dict]:

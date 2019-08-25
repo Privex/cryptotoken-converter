@@ -124,7 +124,8 @@ class EOSManager(BaseManager, EOSMixin):
         sym, contract = self.symbol, self.get_contract(self.symbol)
 
         # Craft the transaction arguments for the transfer operation, then broadcast it and get the result
-        tx_args = {"from": from_address, "to": address, "quantity": f"{amount:.4f} {sym}", "memo": memo}
+        amt = f"{amount:.{self.settings['precision']}f} {sym}"
+        tx_args = {"from": from_address, "to": address, "quantity": amt, "memo": memo}
         tfr = self.build_tx("transfer", contract, from_address, tx_args)
 
         # Some of the important data, e.g. how much was actually sent, is buried in the processed>action_traces
@@ -274,7 +275,8 @@ class EOSManager(BaseManager, EOSMixin):
         sym, contract = self.symbol, self.get_contract(self.symbol)
 
         # Craft the transaction arguments for the issue operation, then broadcast it and get the result
-        tx_args = {"to": address, "quantity": f"{amount:.4f} {sym}", "memo": memo}
+        amt = f"{amount:.{self.settings['precision']}f} {sym}"
+        tx_args = {"to": address, "quantity": amt, "memo": memo}
         tfr = self.build_tx("issue", contract, acc, tx_args)
 
         # Some of the important data, e.g. how much was actually sent, is buried in the processed>action_traces
