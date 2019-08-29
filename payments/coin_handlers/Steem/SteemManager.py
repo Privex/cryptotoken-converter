@@ -169,8 +169,9 @@ class SteemManager(BaseManager, SteemMixin):
         if not empty(memo):
             hist = acc.get_account_history(-1, 10000, only_ops=['transfer'])
             total = Decimal(0)
+            s = SteemLoader(symbols=[self.symbol])
             for h in hist:
-                tx = SteemLoader.clean_tx(h, self.symbol, address, memo)
+                tx = s.clean_tx(h, self.symbol, address, memo)
                 if tx is None:
                     continue
                 total += tx['amount']

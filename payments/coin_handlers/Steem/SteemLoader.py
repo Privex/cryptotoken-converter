@@ -134,8 +134,7 @@ class SteemLoader(BaseLoader, SteemMixin):
             except:
                 log.exception('Error filtering Steem TX, skipping... TX data: %s', tx)
 
-    @staticmethod
-    def clean_tx(tx: dict, symbol: str, account: str, memo: str = None, memo_case: bool = False) -> Union[dict, None]:
+    def clean_tx(self, tx: dict, symbol: str, account: str, memo: str = None, memo_case: bool = False) -> Union[dict, None]:
         """Filters an individual transaction. See :meth:`.clean_txs` for info"""
         # log.debug(tx)
         if tx.get('type', 'NOT SET') != 'transfer':
@@ -146,7 +145,11 @@ class SteemLoader(BaseLoader, SteemMixin):
 
         _am = tx['amount']  # Transfer ops contain a dict 'amount', containing amount:int, nai:str, precision:int
 
-        amt_sym = str(Asset(_am['nai']).symbol).upper()  # Conv asset ID (e.g. @@000000021) to symbol, i.e. "STEEM"
+        if type(_am) is str:   # Extract and validate asset 'ABC' from '12.345 ABC'
+            amt_sym = Asset(_am.split()[1], steem_instance=self.get_rpc(symbol)).symbol.upper()
+        else:  # Conv asset ID (e.g. @@000000021) to symbol, i.e. "STEEM"
+            _asset = Asset(_am['nai'], steem_instance=self.get_rpc(symbol))
+            amt_sym = str(_asset.symbol).upper()
 
         if amt_sym != symbol:  # If the symbol doesn't match the symbol we were passed, skip this TX
             return None
