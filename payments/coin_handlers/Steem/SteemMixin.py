@@ -58,7 +58,7 @@ class SteemMixin(SettingsMixin):
             # If you've specified custom RPC nodes in the custom JSON, make a new instance with those
             # Otherwise, use the global shared_steem_instance.
             rpc_conf = dict(num_retries=5, num_retries_call=3, timeout=20, node=rpcs)
-            log.info('Getting Beem instance for coin %s - settings: %s', rpc_conf)
+            log.info('Getting Beem instance for coin %s - settings: %s', symbol, rpc_conf)
             self._rpc = shared_steem_instance() if empty(rpcs, itr=True) else Steem(**rpc_conf)  # type: Steem
             self._rpc.set_password_storage(settings.get('pass_store', 'environment'))
             self._rpcs[symbol] = self._rpc
@@ -77,7 +77,7 @@ class SteemMixin(SettingsMixin):
         if symbol not in self._rpcs:
             rpcs = self.settings[symbol]['json'].get('rpcs')
             rpc_conf = dict(num_retries=5, num_retries_call=3, timeout=20, node=rpcs)
-            log.info('Getting Beem instance for coin %s - settings: %s', rpc_conf)
+            log.info('Getting Beem instance for coin %s - settings: %s', symbol, rpc_conf)
             self._rpcs[symbol] = self.rpc if empty(rpcs, itr=True) else Steem(**rpc_conf)
         return self._rpcs[symbol]
 
