@@ -146,19 +146,19 @@ class SteemLoader(BaseLoader, SteemMixin):
         _am = tx['amount']  # Transfer ops contain a dict 'amount', containing amount:int, nai:str, precision:int
 
         if type(_am) is str:   # Extract and validate asset 'ABC' from '12.345 ABC'
-            amt_sym = Asset(_am.split()[1], steem_instance=self.get_rpc(symbol)).symbol.upper()
+            amt, _symbol = _am.split()
+            _asset = Asset(symbol, steem_instance=self.get_rpc(symbol))
         else:  # Conv asset ID (e.g. @@000000021) to symbol, i.e. "STEEM"
             _asset = Asset(_am['nai'], steem_instance=self.get_rpc(symbol))
-            amt_sym = str(_asset.symbol).upper()
+            # Convert integer amount/precision to Decimal's, preventing floating point issues
+            amt_int = Decimal(_am['amount'])
+            amt_prec = Decimal(_am['precision'])
 
+            amt = amt_int / (Decimal(10) ** amt_prec)  # Use precision value to convert from integer amt to decimal amt
+        # Get validated symbol from beem Asset
+        amt_sym = str(_asset.symbol)
         if amt_sym != symbol:  # If the symbol doesn't match the symbol we were passed, skip this TX
             return None
-
-        # Convert integer amount/precision to Decimal's, preventing floating point issues
-        amt_int = Decimal(_am['amount'])
-        amt_prec = Decimal(_am['precision'])
-
-        amt = amt_int / (Decimal(10) ** amt_prec)   # Use precision value to convert from integer amt to decimal amt
 
         tx_memo = tx.get('memo')
 
