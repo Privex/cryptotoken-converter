@@ -6,7 +6,7 @@ from payments.models import Deposit, Coin, CoinPair, Conversion
 class CoinSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = Coin
-        fields = ('symbol', 'display_name', 'our_account', 'can_issue')
+        fields = ('symbol', 'display_name', 'our_account', 'can_issue', 'coin_type', 'symbol_id')
 
 
 class DepositSerializer(serializers.HyperlinkedModelSerializer):
