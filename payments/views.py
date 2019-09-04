@@ -57,6 +57,7 @@ class CoinAPI(viewsets.ReadOnlyModelViewSet):
     lookup_value_regex = '[^/]+'
     queryset = Coin.objects.filter(enabled=True)
     serializer_class = CoinSerializer
+    filterset_fields = ('symbol', 'symbol_id', 'our_account', 'coin_type', 'can_issue')
 
 
 class DepositAPI(viewsets.ReadOnlyModelViewSet):
