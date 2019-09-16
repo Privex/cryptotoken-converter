@@ -1,0 +1,60 @@
+{% extends "admin/base_site.html" %}
+{% load i18n cache static l10n %}
+
+{% block extrastyle %}
+    {{ block.super }}
+    <link rel="stylesheet" type="text/css" href="{% static "admin/css/forms.css" %}">
+{% endblock %}
+
+{% block breadcrumbs %}
+    <div class="breadcrumbs">
+        <a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
+        &rsaquo; <a
+            href="">Refund Deposits</a>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <h1>Refund Deposits</h1>
+
+    <ul id="refund-messages" class="messagelist">
+
+    </ul>
+    <form method="POST" action="{% url 'admin:refund_deposits' %}" id="refund-form">
+        {% csrf_token %}
+        <ul>
+        {% for obj in deposits %}
+            <li>Refund {{ obj.amount }} {{ obj.coin_symbol }} to {{ obj.from_account }}
+                (Current Status: {{ obj.get_status_display }})</li>
+            <input type="hidden" name="objects[]" value="{{ obj.pk }}"/>
+        {% endfor %}
+        </ul>
+        <input type="hidden" name="action" value="{{ action }}"/>
+        <input type="hidden" name="select_across" value="{{ select_across }}"/>
+        <input type="hidden" name="index" value="{{ index }}"/>
+        <input type="hidden" name="refund" value="refund"/>
+
+        <div class="submit-row" style="text-align: left">
+            <input type="submit" name="submitbtn" value="Refund Deposits to Sender" id="refund-button"/>
+        </div>
+    </form>
+    <script type="application/javascript">
+        var d = document.querySelector('#refund-button');
+        window.btnclickfn = function (e) {
+            e.preventDefault();
+            var conf = confirm('Warning: This will attempt to refund all of the above. Are you sure?');
+            if (!conf) {
+                return false;
+            }
+            d.removeEventListener('click', window.btnclickfn, true);
+            d.removeEventListener('click', window.btnclickfn, false);
+
+            var msgs = document.querySelector('#refund-messages');
+            msgs.innerHTML = msgs.innerHTML + `<li class="success">Sending refunds... Please wait, this make take
+more than 30 seconds, depending on how many refunds there are.</li>`;
+            d.click();
+            d.disabled = true;
+        };
+        window.btnclick = d.addEventListener('click', window.btnclickfn)
+    </script>
+{% endblock %}

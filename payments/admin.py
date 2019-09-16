@@ -1,4 +1,5 @@
 import logging
+import uuid
 from decimal import Decimal
 
 from django.conf import settings
@@ -8,11 +9,16 @@ from django.contrib import admin, messages
 from django.contrib.admin import AdminSite
 from django.contrib.auth.admin import UserAdmin, GroupAdmin
 from django.contrib.auth.models import User, Group
+from django.contrib.messages.api import add_message
 from django.core.cache import cache
 from django.core.exceptions import PermissionDenied
+from django.db import transaction
+from django.db.models.query import QuerySet
 from django.http import HttpResponseNotAllowed
 from django.shortcuts import render, redirect
+from django.template.response import TemplateResponse
 from django.urls import path
+from django.utils import timezone
 from django.views.decorators.cache import cache_page
 from django.views.generic import TemplateView
 from privex.helpers import empty, is_true
@@ -38,6 +44,109 @@ from payments.coin_handlers import reload_handlers, has_manager, get_manager
 log = logging.getLogger(__name__)
 
 
+def confirm_refund_deposit(modeladmin, request, queryset: QuerySet):
+    """
+    Confirmation page for the "Refund Deposits to Sender" page.
+    :param modeladmin:
+    :param request:
+    :param queryset:
+    :return:
+    """
+    rp = request.POST
+    deps = []
+    for d in queryset:   # type: Deposit
+        if empty(d.from_account):
+            add_message(
+                request, messages.ERROR, f'Cannot refund deposit ({d}) - from_account is blank!'
+            )
+            continue
+        deps.append(d)
+
+    if len(deps) < 1:
+        add_message(
+            request, messages.ERROR,
+            'No valid refundable deposits selected. Only deposits with from_account can be refunded.'
+        )
+        return redirect('/admin/payments/deposit/')
+
+    return TemplateResponse(request, "admin/refund.html", {
+        'deposits': deps,
+        'action': rp.get('action', ''),
+        'select_across': rp.get('select_across', ''),
+        'index': rp.get('index', ''),
+        'selected_action': rp.get('_selected_action', ''),
+    })
+
+
+confirm_refund_deposit.short_description = "Refund Deposits to Sender"
+
+
+def refund_deposits(request):
+    rp = request.POST
+    objlist = rp.getlist('objects[]')
+    if empty(rp.get('refund')) or empty(objlist, itr=True):
+        log.info('Refund value: %s - Objects: %s', rp.get('refund'), objlist)
+        add_message(
+            request, messages.ERROR, f'Error - missing POST data for refund_deposits!'
+        )
+        return redirect('/admin/payments/deposit/')
+
+    deposits = Deposit.objects.filter(id__in=objlist)
+    for d in deposits:  # type: Deposit
+        try:
+            if empty(d.from_account):
+                add_message(
+                    request, messages.ERROR, f'Cannot refund deposit ({d}) - from_account is blank!'
+                )
+                continue
+            with transaction.atomic():
+                log.info('Attempting to refund deposit (%s)', d)
+
+                convs = Conversion.objects.filter(deposit=d)
+
+                if len(convs) > 0:
+                    for conv in convs:
+                        log.info('Removing linked conversion %s', conv)
+                        add_message(request, messages.WARNING, f'Removed linked conversion {str(conv)}')
+                        conv.delete()
+
+                sym = d.coin_symbol
+                memo = f'Refund of {sym} deposit {d.txid}'
+
+                log.debug('Initializing manager for %s', sym)
+                mgr = get_manager(sym)
+
+                log.debug('Calling send_or_issue for amount "%s" to address "%s" with memo "%s"',
+                          d.amount, d.from_account, memo)
+
+                res = mgr.send_or_issue(amount=d.amount, address=d.from_account, memo=memo)
+
+                d.status = 'refund'
+                d.refunded_at = timezone.now()
+                d.refund_coin = res.get('coin', sym)
+                d.refund_memo = memo
+                d.refund_amount = res.get('amount', d.amount)
+                d.refund_address = d.from_account
+                d.refund_txid = res.get('txid', 'N/A')
+                d.save()
+
+
+
+                add_message(
+                    request, messages.SUCCESS, f'Successfully refunded {d.amount} {sym} to {d.from_account}'
+                )
+        except Exception as e:
+            d.status = 'err'
+            d.error_reason = f'Error while refunding: {type(e)} {str(e)}'
+            log.exception('Error while refunding deposit %s', d)
+            d.save()
+            add_message(
+                request, messages.ERROR, f'Error while refunding deposit ({d}) - Reason: {type(e)} {str(e)}'
+            )
+    return redirect('/admin/payments/deposit/')
+
+
+
 class CustomAdmin(AdminSite):
     """
     To allow for custom admin views, we override AdminSite, so we can add custom URLs, among other things.
@@ -48,6 +157,7 @@ class CustomAdmin(AdminSite):
         urls = [
             path('coin_health/', CoinHealthView.as_view(), name='coin_health'),
             path('add_coin_pair/', AddCoinPairView.as_view(), name='easy_add_pair'),
+            path('refund_deposits/', refund_deposits, name='refund_deposits'),
             path('_clear_cache/', clear_cache, name='clear_cache'),
         ]
         return _urls + urls
@@ -148,6 +258,7 @@ class DepositAdmin(admin.ModelAdmin):
     list_filter = ('status', 'coin',)
     search_fields = ('id', 'txid', 'address', 'from_account', 'to_account', 'memo', 'refund_address')
     ordering = ('-tx_timestamp',)
+    actions = [confirm_refund_deposit]
 
 
 class KeyPairAdmin(admin.ModelAdmin):

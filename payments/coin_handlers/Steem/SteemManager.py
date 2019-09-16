@@ -250,10 +250,15 @@ class SteemManager(BaseManager, SteemMixin):
             ###
             # Broadcast the transfer transaction on the network, and return the necessary data
             ###
-            log.debug('Sending %f %s to @%s', amount, sym, address)
+            log.info('Sending %f %s to @%s', amount, sym, address)
             tfr = acc.transfer(address, amount, sym, memo)
+            log.info('Attempting to find TX for %f %s to %s', amount, sym, address)
             # Beem's finalizeOp doesn't include TXID, so we try to find the TX on the blockchain after broadcast
-            tx = self.find_steem_tx(tfr)
+            tx = self.find_steem_tx(tfr, last_blocks=5)
+            if not tx:
+                log.info('TX not in last 5 blocks. Searching last 20 blocks.')
+                tx = self.find_steem_tx(tfr, last_blocks=20)
+                tx = {} if not tx else tx
 
             log.debug('Success? TX Data - Transfer: %s Lookup TX: %s', tfr, tx)
             # Return TX data compatible with BaseManager standard

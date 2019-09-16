@@ -436,6 +436,9 @@ class Conversion(models.Model):
     def from_amount(self):
         return self.deposit.amount
 
+    def __str__(self):
+        return f'Conversion ID {self.id} - From: {self.from_coin} to {self.to_coin} (Destination: {self.to_address})'
+
 
 
 
