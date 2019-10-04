@@ -63,24 +63,26 @@ BITSHARES_RPC_NODE = env('BITSHARES_RPC_NODE', 'wss://eu.nodes.bitshares.ws')
 # General CryptoToken Converter settings
 ####
 
-# Used for encrypting and decrypting private keys so they cannot be displayed in plain text by the admin panel,
-# or external applications accessing the DB.
-# Generate an encryption key using ./manage.py generate_key.
-# To print just the key, use ``./manage.py generate_key 2> /dev/null``
+
 ENCRYPT_KEY = env('ENCRYPT_KEY')
+"""
+Used for encrypting and decrypting private keys so they cannot be displayed in plain text by the admin panel,
+or external applications accessing the DB.
+Generate an encryption key using ``./manage.py generate_key.``
+To print just the key, use ``./manage.py generate_key 2> /dev/null``
+"""
+EX_FEE = Decimal(env('EX_FEE', '0'))
+"""Conversion fee taken by us, in percentage (i.e. "1" = 1%)"""
 
-EX_FEE = Decimal(env('EX_FEE', '0'))  # Conversion fee taken by us, in percentage (i.e. "1" = 1%)
-
-
-# This is used for the dropdown "Coin Type" selection in the Django admin panel. Coin handlers may add to this list.
 COIN_TYPES = (
     ('crypto', 'Generic Cryptocurrency',),
     ('token', 'Generic Token'),
 )
+"""This is used for the dropdown "Coin Type" selection in the Django admin panel. Coin handlers may add to this list."""
 
-# Load coin handlers from this absolute module path
 COIN_HANDLERS_BASE = env('COIN_HANDLERS_BASE', 'payments.coin_handlers')
-# A comma separated list of modules to load
+"""Load coin handlers from this absolute module path"""
+
 COIN_HANDLERS = env_csv('COIN_HANDLERS', [
     'SteemEngine',
     'Bitcoin',
@@ -89,10 +91,25 @@ COIN_HANDLERS = env_csv('COIN_HANDLERS', [
     'Bitshares',
     'Appics',
 ])
+"""
+Specify in the env var ``COIN_HANDERS`` a comma separated list of local coin handlers
+:py:mod:`payments.coin_handlers` to load. If not specified, the default list will be used.
+"""
 
-# After the first email to inform admins a wallet is low, how long before we send out a second notification?
-# (in hours) (Default: 12 hrs)
+PRIVEX_HANDLERS = env_csv('PRIVEX_HANDLERS', [
+    'Golos'
+])
+"""
+These handlers are from the :py:my:`privex.coin_handlers` package, so they're loaded differently to the
+handlers listed in :py:attr:`.COIN_HANDLERS`
+"""
+
+
 LOWFUNDS_RENOTIFY = int(env('LOWFUNDS_RENOTIFY', 12))
+"""
+After the first email to inform admins a wallet is low, how long before we send out a second notification?
+(in hours) (Default: 12 hrs)
+"""
 
 #########
 # Defaults for pre-installed Coin Handlers, to avoid potential exceptions when accessing their settings.

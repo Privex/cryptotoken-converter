@@ -75,7 +75,9 @@ from django.conf import settings
 from django.db.migrations.executor import MigrationExecutor
 from django.db import connections, DEFAULT_DB_ALIAS
 from payments.coin_handlers.base import BaseLoader, BaseManager
+from privex import coin_handlers as ch
 
+from payments.coin_handlers.extras import EncryptedKeyStore
 
 handlers = {}
 """
@@ -200,9 +202,54 @@ def add_handler(handler, handler_type):
         handlers[symbol][handler_type].append(h)
 
 
+def init_privex_handler(name: str):
+    """
+    Attempt to import a :py:mod:`privex.coin_handlers` handler module, adapting it for SteemEngine's older
+    Coin Handler system.
+    
+     * Extracts the handler type and description for injection into ``settings.COIN_TYPES`` (since privex handlers
+       are framework independent and cannot auto-inject into ``settings.COIN_TYPE``)
+     * Configures the Privex coin_handlers coin object based on a database :class:`.Coin` row
+     * Detects coins which are mapped to a Privex coin handler and registers the handler's manager/loader into
+       the global handlers dictionary
+     
+    :param str name: The name of a :py:mod:`privex.coin_handlers` handler module, e.g. ``Golos``
+    """
+    from payments.models import Coin
+
+    modpath = name if '.' in name else f'privex.coin_handlers.{name}'
+
+    i = import_module(modpath)
+    ctype, cdesc = i.COIN_TYPE, i.HANDLER_DESC
+    
+    # Inject the handler type + description into settings.COIN_TYPE if it's not already there, so it can be used
+    # in the admin panel and other areas.
+    if ctype not in dict(settings.COIN_TYPES):
+        log.debug('(Privex) %s not in COIN_TYPES, adding it.', ctype)
+        settings.COIN_TYPES += ((ctype, cdesc,),)
+    
+    # Find any coins which are already configured to use this handler, then register the Privex coin handler with
+    # the global handler storage
+    hcoins = Coin.objects.filter(coin_type=ctype)
+    for coin in hcoins:  # type: Coin
+        ch.configure_coin(
+            coin.symbol_id, our_account=coin.our_account, display_name=coin.display_name,
+            **coin.settings, **coin.settings['json']
+        )
+        ch.add_handler_coin(name, coin.symbol_id)
+        if coin.symbol not in handlers:
+            handlers[coin.symbol] = dict(loaders=[], managers=[])
+        # After re-configuring each coin, we need to reload Privex's coin handlers before getting the manager/loader
+        ch.reload_handlers()
+        # We hand off to privex.coin_handlers.get_manager/loader to initialise the handler's classes, rather than
+        # trying to do it ourselves. Then we register them with the global handler store.
+        handlers[coin.symbol]['managers'].append(ch.get_manager(coin.symbol_id))
+        handlers[coin.symbol]['loaders'].append(ch.get_loader(coin.symbol_id))
+        
+
 def reload_handlers():
     """
-    Resets `handler` to an empty dict, then loads all `settings.COIN_HANDLER` classes into the dictionary `handlers`
+    Resets `handlers` to an empty dict, then loads all `settings.COIN_HANDLER` classes into the dictionary `handlers`
     using `settings.COIN_HANDLERS_BASE` as the base module path to load from
     """
     global handlers, handlers_loaded
@@ -215,10 +262,10 @@ def reload_handlers():
         log.warning('Cannot run reload_handlers because there are unapplied migrations!')
         return
 
-    for ch in settings.COIN_HANDLERS:
+    for chnd in settings.COIN_HANDLERS:
         try:
-            log.debug('Loading coin handler %s', ch)
-            i = import_module('.'.join([ch_base, ch]))
+            log.debug('Loading coin handler %s', chnd)
+            i = import_module('.'.join([ch_base, chnd]))
             # To avoid a handler's initialising code being ran every time the module is imported, a handler's init file
             # can define a reload() function, which is only ran the first time the module is loaded.
             # If reload_handlers() has been called, then we need to make sure we force reload those with a reload func.
@@ -226,15 +273,33 @@ def reload_handlers():
                 i.reload()
             ex = i.exports
             if 'loader' in ex:
-                log.debug('Adding loader class for %s', ch)
+                log.debug('Adding loader class for %s', chnd)
                 add_handler(ex['loader'], 'loaders')
             if 'manager' in ex:
-                log.debug('Adding manager class for %s', ch)
+                log.debug('Adding manager class for %s', chnd)
                 add_handler(ex['manager'], 'managers')
         except:
-            log.exception("Something went wrong loading the handler %s", ch)
+            log.exception("Something went wrong loading the handler %s", chnd)
             log.error("Skipping this handler...")
 
+    # Privex's `privex-coinhandlers` package is unaware of our `CryptoKeyPair` system, so we use our KeyStore
+    # wrapper class `EncryptedKeyStore` and ensure that the Privex coin_handlers global key store is set to our wrapper.
+    from payments.models import CryptoKeyPair
+    log.debug('Setting Privex KeyStore')
+    ch.set_key_store(EncryptedKeyStore(model=CryptoKeyPair))
+
+    log.debug('Scanning Privex Handlers')
+    for chnd in settings.PRIVEX_HANDLERS:
+        try:
+            log.debug('Loading Privex coin handler %s', chnd)
+            # Enable the Privex coin handler, then pass over to init_privex_handler to adapt the foreign handler
+            # to CTC's handler system
+            ch.enable_handler(chnd)
+            init_privex_handler(chnd)
+        except:
+            log.exception("Something went wrong loading the privex.coin_handler %s", chnd)
+            log.error("Skipping this handler...")
+    
     handlers_loaded = True
     log.debug('All handlers:')
     for sym, hdic in handlers.items():

@@ -284,6 +284,9 @@ LOGGING = {
     }
 }
 
+if DEBUG:
+    LOGGING['loggers']['django.request']['handlers'] = ['console', 'logfile']
+
 # Internationalization
 # https://docs.djangoproject.com/en/2.1/topics/i18n/
 

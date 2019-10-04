@@ -332,6 +332,8 @@ class Command(CronLoggerMixin, BaseCommand):
             help="Dry run (don't actually send any coins, just print what would happen)",
         )
 
+        parser.add_argument('--coins', type=str, help='Comma separated list of symbols to run conversions for')
+
     def detect_deposit(self, deposit: Deposit):
         """
         Validates a Deposit through various sanity checks, detects which coin the Deposit is destined for, as well as
@@ -397,13 +399,21 @@ class Command(CronLoggerMixin, BaseCommand):
         # Load all "new" deposits, max of 200 in memory at a time to avoid memory leaks.
         new_deposits = Deposit.objects.filter(status='new').iterator(200)
         log.info('Coin converter and deposit validator started')
-
+        coins = None
+        if not empty(options['coins']):
+            coins = options['coins'].split(',')
+            log.info('Option --coins was specified. Only loading TXs for coins: %s', [str(c) for c in coins])
+        
         # ----------------------------------------------------------------
         # Validate deposits and map them to a destination coin / address
         # ----------------------------------------------------------------
         log.info('Validating deposits that are in state "new"')
         for d in new_deposits:
             try:
+                if coins is not None:
+                    if d.coin.symbol not in coins:
+                        log.debug('Skipping deposit %s as --coins was specified, and did not match.', d)
+                        continue
                 log.debug('Validating and mapping deposit %s', d)
                 with transaction.atomic():
                     try:

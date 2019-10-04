@@ -71,6 +71,7 @@ class Command(CronLoggerMixin, BaseCommand):
         #                 from_account:str, to_account:str, memo:str, amount:Decimal}
         for tx in txs:
             try:
+                tx = dict(tx)
                 dupes = Deposit.objects.filter(txid=tx['txid']).count()
                 if dupes > 0:
                     log.debug('Skipping TX %s as it already exists', tx['txid'])

@@ -119,7 +119,7 @@ class SteemManager(BaseManager, SteemMixin):
         Check if our Steem node works or not, by requesting basic information such as the current block + time, and
         checking if our sending/receiving account exists on Steem.
 
-        :return bool: True if Steem appearsto be working, False if it seems to be broken.
+        :return bool: True if Steem appears to be working, False if it seems to be broken.
         """
         try:
             _, _, health_data = self.health()
