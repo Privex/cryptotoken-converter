@@ -154,6 +154,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'rest_framework',
     'django_filters',
+    'lockmgr',   # Privex's django-lockmgr package
     'payments',
 ]
 

@@ -33,6 +33,7 @@ gunicorn = "~=19.9"
 cryptography = ">=2.6.1"
 libeospy = "==1.1.11"
 bitshares = "==0.3.2"
+django-lockmgr = "~=1.0.0"
 
 [requires]
 python_version = "3.7"
