@@ -1,0 +1,22 @@
+[Unit]
+Description=Privex CryptoToken Converter
+After=network.target
+
+[Service]
+Type=simple
+User=ctcuser
+
+WorkingDirectory=/home/ctcuser/ctc/
+EnvironmentFile=/home/ctcuser/ctc/.env
+
+ExecStart=/home/ctcuser/ctc/run.sh prod \
+        --bind=127.0.0.1:8009 --timeout 600 -w 8 steemengine.wsgi
+
+Restart=always
+Environment=PYTHONUNBUFFERED=0
+RestartSec=30
+StandardOutput=syslog
+
+[Install]
+WantedBy=multi-user.target
+Alias=ctc.service

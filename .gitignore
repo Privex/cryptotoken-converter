@@ -3,3 +3,5 @@ venv/
 *.pyc
 docs/build
 *.log
+
+.crons.txt

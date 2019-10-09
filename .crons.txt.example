@@ -1,0 +1,2 @@
+pipenv run ./manage.py load_txs
+pipenv run ./manage.py convert_coins

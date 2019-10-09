@@ -48,24 +48,27 @@ If you'd like to contribute to our documentation, scroll down to [Building the D
 # Quickstart
 
 ```bash
+# If you don't already have pipenv installed
+pip3 install pipenv
+
 git clone https://github.com/Privex/cryptotoken-converter.git
 cd cryptotoken-converter
-python3.7 -m venv venv
-source venv/bin/activate
-pip3 install -r requirements.txt
+
+pipenv install
 
 touch .env
 chmod 700 .env
 # Open .env in a text editor and configure as needed
 
-./manage.py migrate
-./manage.py createsuperuser
+./run.sh migrate
+./run.sh createsuperuser
 
-# Use runserver for development only
-./manage.py runserver
+# Use 'dev' for development only, do not use in production!
+./run.sh dev
 
-# For production, use gunicorn
-gunicorn steemengine.wsgi
+# For production, use gunicorn via 'serve' or 'prod'
+./run.sh serve
+
 ```
 
 Example .env file:
@@ -164,7 +167,8 @@ included in the main project requirements.txt as they're only needed for the doc
 
 ```bash
 cd docs/
-pip3 install -r requirements.txt
+# Install all requirements, plus development/documentation requirements
+pipenv install --dev
 ```
 
 For development purposes, we've included [sphinx-autobuild](https://github.com/GaretJax/sphinx-autobuild), which

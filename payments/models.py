@@ -307,7 +307,7 @@ class Deposit(models.Model):
     txid = models.CharField('Transaction ID', max_length=100, db_index=True)
     """The transaction ID where the coins were received."""
 
-    coin = models.ForeignKey(Coin, db_index=True, on_delete=models.DO_NOTHING, related_name='deposits')
+    coin = models.ForeignKey(Coin, db_index=True, on_delete=models.CASCADE, related_name='deposits')
     """The symbol of the cryptocurrency or token that was deposited, in uppercase. e.g. LTC, LTCP, BTCP, STEEMP"""
 
     vout = models.IntegerField('Output Number (if multiple deposits in one tx)', default=0, blank=True)
@@ -343,7 +343,7 @@ class Deposit(models.Model):
 
     # NOTE: Do not rely on these two fields. If they aren't blank, that DOES NOT mean this deposit was converted.
     # It's simply to assist in searching deposits, especially ones that have NOT yet been converted.
-    convert_to = models.ForeignKey(Coin, blank=True, null=True, default=None, on_delete=models.DO_NOTHING,
+    convert_to = models.ForeignKey(Coin, blank=True, null=True, default=None, on_delete=models.SET_NULL,
                                    related_name='deposit_converts')
     """The destination coin. Set after a deposit has been analyzed, and we know what coin it will be converted to"""
 
@@ -393,15 +393,15 @@ class Conversion(models.Model):
     Successful conversion attempts are logged here, allowing for reference of where the coins came from, where
     they went, and what fees were taken.
     """
-    deposit = models.OneToOneField(Deposit, related_name='conversion', on_delete=models.DO_NOTHING)
+    deposit = models.OneToOneField(Deposit, related_name='conversion', on_delete=models.CASCADE)
 
-    from_coin = models.ForeignKey(Coin, verbose_name="From Coin", on_delete=models.DO_NOTHING,
+    from_coin = models.ForeignKey(Coin, verbose_name="From Coin", on_delete=models.CASCADE,
                                   related_name='conversions_from')
     """The coin that we were sent"""
 
     from_address = models.CharField('From Address / Account (if known)', max_length=255, blank=True, null=True)
 
-    to_coin = models.ForeignKey(Coin, verbose_name="Converted Into (Symbol)", on_delete=models.DO_NOTHING,
+    to_coin = models.ForeignKey(Coin, verbose_name="Converted Into (Symbol)", on_delete=models.CASCADE,
                                 related_name='conversions_to')
     """The destination token/crypto this token will be converted to"""
 
