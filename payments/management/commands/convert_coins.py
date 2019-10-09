@@ -25,6 +25,7 @@ from django.core.management import BaseCommand
 from django.db import transaction
 from django.template.loader import render_to_string
 from django.utils import timezone
+from lockmgr.lockmgr import LockMgr, Locked
 from privex.helpers import is_true
 
 from payments.coin_handlers import get_manager
@@ -334,7 +335,7 @@ class Command(CronLoggerMixin, BaseCommand):
 
         parser.add_argument('--coins', type=str, help='Comma separated list of symbols to run conversions for')
 
-    def detect_deposit(self, deposit: Deposit):
+    def detect_deposit(self, deposit: Deposit) -> Deposit:
         """
         Validates a Deposit through various sanity checks, detects which coin the Deposit is destined for, as well as
         where to send it to.
@@ -346,24 +347,25 @@ class Command(CronLoggerMixin, BaseCommand):
         :raises ConvertInvalid: Raised when a Deposit fails validation, i.e. the sender ignored our instructions.
         """
         d = deposit
-        if d.status != 'new':
-            raise ConvertError("Deposit is not in 'new' state during detect_deposit... Something is very wrong!")
-        try:
-            log.debug('Validating deposit and getting dest details for deposit %s', d)
-            # Validate the deposit, and grab the destination coin details
-            address, pair, dest_memo = ConvertCore.validate_deposit(d)
-            # If no exception was thrown, we change the state to 'mapped' and save the destination details.
-            log.debug('Deposit mapped to destination. pair: "%s", addr: "%s", memo: "%s"', pair, address, dest_memo)
-            d.status = 'mapped'
-            d.convert_to = pair.to_coin
-            d.convert_dest_address = address
-            d.convert_dest_memo = dest_memo
-            d.save()
-
-            return d
-        except (CoinPair.DoesNotExist, Coin.DoesNotExist):
-            log.warning('Marking "inv" - no such coin pair... deposit: "%s"', d)
-            raise ConvertInvalid('Deposit is for non-existent coin pair')
+        with LockMgr(f'detect_deposit:{d.id}'):
+            if d.status != 'new':
+                raise ConvertError("Deposit is not in 'new' state during detect_deposit... Something is very wrong!")
+            try:
+                log.debug('Validating deposit and getting dest details for deposit %s', d)
+                # Validate the deposit, and grab the destination coin details
+                address, pair, dest_memo = ConvertCore.validate_deposit(d)
+                # If no exception was thrown, we change the state to 'mapped' and save the destination details.
+                log.debug('Deposit mapped to destination. pair: "%s", addr: "%s", memo: "%s"', pair, address, dest_memo)
+                d.status = 'mapped'
+                d.convert_to = pair.to_coin
+                d.convert_dest_address = address
+                d.convert_dest_memo = dest_memo
+                d.save()
+    
+                return d
+            except (CoinPair.DoesNotExist, Coin.DoesNotExist):
+                log.warning('Marking "inv" - no such coin pair... deposit: "%s"', d)
+                raise ConvertInvalid('Deposit is for non-existent coin pair')
 
     def convert_deposit(self, deposit: Deposit, dry=False):
         """
@@ -376,24 +378,25 @@ class Command(CronLoggerMixin, BaseCommand):
         """
         d = deposit
 
-        if d.status != 'mapped':
-            raise ConvertError("Deposit is not in 'mapped' state during convert_deposit... Something is very wrong!")
-        try:
-            if empty(d.convert_to) or empty(d.convert_dest_address):
-                raise ConvertError('Deposit "convert_to" or "convert_dest_addr" is empty... Cannot convert!')
-            pair = CoinPair.objects.get(from_coin=d.coin, to_coin=d.convert_to)
-            log.debug('Converting deposit ID %s from %s to %s, coin pair: %s', d.id, d.coin, d.convert_to, pair)
-            # Convert() will send the coins, update the Deposit, and create the Conversion object in the DB,
-            # as well as some additional validation such as balance checks.
-            if dry:
-                log.debug(f"DRT RUN: Would run ConvertCore.convert({d}, {pair}, {d.convert_dest_address}, "
-                          f"dest_memo='{d.convert_dest_memo}')")
-                return True
-            else:
-                return ConvertCore.convert(d, pair, d.convert_dest_address, dest_memo=d.convert_dest_memo)
-
-        except (CoinPair.DoesNotExist, Coin.DoesNotExist):
-            raise ConvertInvalid('Deposit is for non-existent coin pair')
+        with LockMgr(f'convert_deposit:{d.id}'):
+            if d.status != 'mapped':
+                raise ConvertError("Deposit not in 'mapped' state during convert_deposit... Something is very wrong!")
+            try:
+                if empty(d.convert_to) or empty(d.convert_dest_address):
+                    raise ConvertError('Deposit "convert_to" or "convert_dest_addr" is empty... Cannot convert!')
+                pair = CoinPair.objects.get(from_coin=d.coin, to_coin=d.convert_to)
+                log.debug('Converting deposit ID %s from %s to %s, coin pair: %s', d.id, d.coin, d.convert_to, pair)
+                # Convert() will send the coins, update the Deposit, and create the Conversion object in the DB,
+                # as well as some additional validation such as balance checks.
+                if dry:
+                    log.debug(f"DRT RUN: Would run ConvertCore.convert({d}, {pair}, {d.convert_dest_address}, "
+                              f"dest_memo='{d.convert_dest_memo}')")
+                    return True
+                else:
+                    return ConvertCore.convert(d, pair, d.convert_dest_address, dest_memo=d.convert_dest_memo)
+    
+            except (CoinPair.DoesNotExist, Coin.DoesNotExist):
+                raise ConvertInvalid('Deposit is for non-existent coin pair')
 
     def handle(self, *args, **options):
         # Load all "new" deposits, max of 200 in memory at a time to avoid memory leaks.
@@ -410,33 +413,21 @@ class Command(CronLoggerMixin, BaseCommand):
         log.info('Validating deposits that are in state "new"')
         for d in new_deposits:
             try:
-                if coins is not None:
-                    if d.coin.symbol not in coins:
-                        log.debug('Skipping deposit %s as --coins was specified, and did not match.', d)
-                        continue
+                if coins is not None and d.coin.symbol not in coins:
+                    log.debug('Skipping deposit %s as --coins was specified, and did not match.', d)
+                    continue
                 log.debug('Validating and mapping deposit %s', d)
                 with transaction.atomic():
                     try:
                         self.detect_deposit(d)
+                    except Locked:
+                        log.warning('Warning: Deposit "%s" is currently locked in detection phase. Skipping.', d)
+                        continue
                     except ConvertError as e:
                         # Something went very wrong while processing this deposit. Log the error, store the reason
                         # onto the deposit, and then save it.
                         log.error('ConvertError while validating deposit "%s" !!! Message: %s', d, str(e))
-                        try:
-                            mgr = get_manager(d.coin.symbol) # type: SettingsMixin
-                            auto_refund = mgr.settings.get(d.coin.symbol, {}).get('auto_refund', False)
-                            if is_true(auto_refund):
-                                log.info(f'Auto refund is enabled for coin {d.coin}. Attempting return to sender.')
-                                ConvertCore.refund_sender(deposit=d)
-                            else:
-                                d.status = 'err'
-                                d.error_reason = str(e)
-                                d.save()
-                        except Exception as e:
-                            log.exception('An exception occurred while checking if auto_refund was enabled...')
-                            d.status = 'err'
-                            d.error_reason = f'Auto refund failure: {str(e)}'
-                            d.save()
+                        self._auto_refund(d, e)
                     except ConvertInvalid as e:
                         # This exception usually means the sender didn't read the instructions properly, or simply
                         # that the transaction wasn't intended to be exchanged.
@@ -444,10 +435,11 @@ class Command(CronLoggerMixin, BaseCommand):
                         d.status = 'inv'
                         d.error_reason = str(e)
                         d.save()
-            except:
+            except (BaseException, Exception) as e:
                 log.exception('UNHANDLED EXCEPTION. Deposit could not be validated/detected... %s', d)
                 d.status = 'err'
-                d.error_reason = 'Unknown error while validating deposit. An admin must manually check the error logs.'
+                d.error_reason = "Unknown error while validating deposit. An admin should check the error logs.\n" \
+                                 f"Last Exception was:\n{type(e)}\n{str(e)}"
                 d.save()
         log.info('Finished validating new deposits for conversion')
 
@@ -462,6 +454,9 @@ class Command(CronLoggerMixin, BaseCommand):
                 with transaction.atomic():
                     try:
                         self.convert_deposit(d, options['dry'])
+                    except Locked:
+                        log.warning('Warning: Deposit "%s" is currently locked in conversion phase. Skipping.', d)
+                        continue
                     except ConvertError as e:
                         # Something went very wrong while processing this deposit. Log the error, store the reason
                         # onto the deposit, and then save it.
@@ -494,6 +489,26 @@ class Command(CronLoggerMixin, BaseCommand):
             else:
                 log.debug(' !!! Coin %s still has %d mapped deposits. Ignoring.', c, map_deps)
         log.debug('Finished resetting coins with "funds_low" that have been resolved.')
+
+    def _auto_refund(self, deposit, last_error=None):
+        last_error = "No error passed to _auto_refund, error reason is unknown." if not last_error else last_error
+        
+        try:
+            mgr = get_manager(deposit.coin.symbol)  # type: SettingsMixin
+            auto_refund = mgr.settings.get(deposit.coin.symbol, {}).get('auto_refund', False)
+            if is_true(auto_refund):
+                log.info(f'Auto refund is enabled for coin {deposit.coin}. Attempting return to sender.')
+                return ConvertCore.refund_sender(deposit=deposit)
+            deposit.status = 'err'
+            deposit.error_reason = str(last_error)
+            deposit.save()
+            return False
+        except Exception as e:
+            log.exception('An exception occurred while checking if auto_refund was enabled...')
+            deposit.status = 'err'
+            deposit.error_reason = f'Auto refund failure: {str(e)}'
+            deposit.save()
+            return False
 
 
 

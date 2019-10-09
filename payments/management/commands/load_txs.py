@@ -3,6 +3,7 @@ import logging
 from django.core.management import BaseCommand
 from django.core.management.base import CommandParser
 from django.db import transaction
+from lockmgr.lockmgr import LockMgr, Locked
 
 from payments.coin_handlers import get_loaders, has_loader
 from payments.coin_handlers.base import BaseLoader
@@ -43,16 +44,17 @@ class Command(CronLoggerMixin, BaseCommand):
         if not has_loader(symbol):
             log.warning('Coin %s is enabled, but no Coin Handler has a loader setup for it. Skipping.', symbol)
             return
-        loaders = get_loaders(symbol)
-        for l in loaders:   # type: BaseLoader
-            log.debug('Scanning using loader %s', type(l))
-            finished = False
-            l.load()
-            txs = l.list_txs(self.BATCH)
-            while not finished:
-                log.debug('Loading batch of %s TXs for DB insert', self.BATCH)
-                with transaction.atomic():
-                    finished = self.import_batch(txs, self.BATCH)
+        with LockMgr(f'load_txs:{symbol}'):
+            loaders = get_loaders(symbol)
+            for l in loaders:   # type: BaseLoader
+                log.debug('Scanning using loader %s', type(l))
+                finished = False
+                l.load()
+                txs = l.list_txs(self.BATCH)
+                while not finished:
+                    log.debug('Loading batch of %s TXs for DB insert', self.BATCH)
+                    with transaction.atomic():
+                        finished = self.import_batch(txs, self.BATCH)
 
     def import_batch(self, txs: iter, batch: int) -> bool:
         """
@@ -103,6 +105,8 @@ class Command(CronLoggerMixin, BaseCommand):
         for c in coins:
             try:
                 self.load_txs(c.symbol)
+            except Locked:
+                log.warning('Warning: A lock is already held for load_txs:%s - Skipping.', c.symbol)
             except:
                 log.exception('Error loading transactions for coin %s. Moving onto the next coin.', c)
 
