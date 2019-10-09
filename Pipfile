@@ -4,36 +4,46 @@ url = "https://pypi.org/simple"
 verify_ssl = true
 
 [dev-packages]
-Faker = ">=1.0.4"
+Faker = "~=1.0.4"
+MarkupSafe = "~=1.1.1"
 Sphinx = "~=1.8.5"
+docutils = "~=0.14"
 sphinx-autobuild = "~=0.7.1"
 sphinx-rtd-theme = "~=0.4.3"
-MarkupSafe = "~=1.1.1"
-docutils = "~=0.14"
 
 [packages]
 django = "~=2.2.6"
-django-dotenv = "~=1.4.2"
+django-cors-headers = "~=2.5.2"
+django-filter = "~=2.1.0"
 django-getenv = "~=1.3.2"
 djangorestframework = "~=3.9.2"
 djangorestframework-stubs = "~=0.3.0"
-django-filter = "~=2.1.0"
-django-cors-headers = "==2.5.2"
-privex-helpers = ">=1.3.3"
-privex-coinhandlers = ">=1.2.7"
-privex-loghelper = "~=1.0"
-privex-steemengine = "~=1.1"
-privex-jsonrpc = "~=1.1"
-mysqlclient = "~=1.4.0"
-psycopg2 = "~=2.7"
-requests = "~=2.21"
-beem = "~=0.20"
 python-dateutil = "~=2.8"
 gunicorn = "~=19.9"
-cryptography = ">=2.6.1"
-libeospy = "==1.1.11"
-bitshares = "==0.3.2"
-django-lockmgr = "~=1.0.0"
+
+celery = {extras = ["gevent", "redis"],"version ~" = "4.3.0"}
+
+
+# Packages maintained by Privex Inc.
+privex-coinhandlers = ">=1.2.7"
+privex-helpers = "~=1.3.3"
+privex-jsonrpc = "~=1.1.4"
+privex-loghelper = "~=1.0.0"
+privex-steemengine = "~=1.1.3"
+django-lockmgr = "~=1.1.0"
+
+# Database connectors
+psycopg2 = "~=2.7
+mysqlclient = "~=1.4.0"
+
+
+# Packages for handling cryptocurrency
+requests = "~=2.21"
+libeospy = "~=1.1.11"
+beem = "~=0.20"
+bitshares = "~=0.3.2"
+cryptography = "~=2.6.1"
+
 
 [requires]
 python_version = "3.7"
