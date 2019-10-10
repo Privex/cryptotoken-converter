@@ -52,7 +52,7 @@ def reload():
         settings.COIN_TYPES += (('steemengine', 'SteemEngine Token',),)
 
     # Grab a simple list of coin symbols with the type 'bitcoind' to populate the provides lists.
-    provides = Coin.objects.filter(coin_type='steemengine').values_list('symbol', flat=True)
+    provides = Coin.objects.filter(coin_type='steemengine', enabled=True).values_list('symbol', flat=True)
     SteemEngineLoader.provides = provides
     SteemEngineManager.provides = provides
 

@@ -1,5 +1,7 @@
+import json
 import logging
 import uuid
+import celery.exceptions
 from decimal import Decimal
 
 from django.conf import settings
@@ -15,15 +17,18 @@ from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.db.models.query import QuerySet
 from django.http import HttpResponseNotAllowed
+from django.http.response import JsonResponse
 from django.shortcuts import render, redirect
 from django.template.response import TemplateResponse
 from django.urls import path
 from django.utils import timezone
 from django.views.decorators.cache import cache_page
 from django.views.generic import TemplateView
-from privex.helpers import empty, is_true
+from lockmgr.lockmgr import is_locked
+from privex.helpers import empty, is_true, dec_round
 
-from payments.models import Coin, Deposit, AddressAccountMap, CoinPair, Conversion, CryptoKeyPair
+from payments import tasks
+from payments.models import Coin, Deposit, AddressAccountMap, CoinPair, Conversion, CryptoKeyPair, TaskLog
 
 """
     +===================================================+
@@ -79,6 +84,88 @@ def confirm_refund_deposit(modeladmin, request, queryset: QuerySet):
 
 
 confirm_refund_deposit.short_description = "Refund Deposits to Sender"
+
+
+def celery_refund_deposit(request):
+    try:
+        rp = json.loads(request.body)
+        deposit_id = rp.get('deposit_id')
+    except json.JSONDecodeError:
+        return JsonResponse(
+            dict(error=True, code="JSON_ERR", message=f"Invalid JSON was posted..."),
+            status=400
+        )
+    try:
+        if empty(deposit_id):
+            return JsonResponse(dict(
+                error=True, message="Cannot refund, deposit ID is empty!", code="ID_EMPTY"
+            ), status=400)
+        if is_locked(f'auto_refund:{deposit_id}'):
+            return JsonResponse(dict(
+                error=True, message="A refund attempt is already running!", code="ALREADY_RUNNING",
+            ), status=400)
+        
+        tl = tasks.background_task(
+            tasks.refund, 'admin.celery_refund_deposit', t_conf=dict(link_error=tasks.handle_errors.s(deposit_id)),
+            deposit_id=deposit_id
+        )
+        return JsonResponse(dict(
+            error=False, message="Running refund in background.", code="SUCCESS", deposit_id=deposit_id,
+            id=tl.id, celery_task_id=tl.task_id
+        ))
+    except Deposit.DoesNotExist:
+        return JsonResponse(
+            dict(error=True, code="NOT_FOUND", message=f"Deposit ID '{deposit_id}' not found..."),
+            status=404
+        )
+    except Exception as e:
+        return JsonResponse(dict(
+            error=True, code="REFUND_ERROR",
+            message=f"An exception occurred during the refund request: {type(e)} {str(e)}"
+        ), status=500)
+
+
+def celery_check_refund(request, task_id: int):
+    """
+    
+    refund_data format::
+    
+          dict {
+            txid:str    - Transaction ID - None if not known,
+            coin:str    - Symbol that was sent,
+            amount:str  - The amount that was sent (after fees),
+            fee:str     - TX Fee that was taken from the amount,
+            from:str       - The account(s)/address(es) the coins were sent from. if more than one, comma separated.
+                             If it's not possible to determine easily, set this to None.
+            send_type:str  - Should be statically set to "send"
+          }
+    
+    """
+    try:
+        tl: TaskLog = TaskLog.objects.get(id=int(task_id), queued_by='admin.celery_refund_deposit')
+        res: dict = tl.task_get(timeout=20)
+        ref_data = res['refund_data']
+        ref_data['amount'] = str(dec_round(ref_data['amount'], dp=5))
+        str_nums = {k: str(v) for k, v in ref_data.items() if type(v) is Decimal}
+        rdata = {**ref_data, **str_nums}
+        return JsonResponse(dict(
+            error=False, message="Refund completed.", code="SUCCESS", deposit_id=tl.deposit_id,
+            id=tl.id, celery_task_id=tl.task_id, refund_data=rdata, deposit=dict(
+                from_account=tl.deposit.from_account, to_account=tl.deposit.to_account,
+                refund_memo=tl.deposit.refund_memo, refund_txid=tl.deposit.refund_txid
+            )
+        ))
+    except celery.exceptions.TimeoutError:
+        return JsonResponse(dict(
+            error=True, message=f"Refund is still running... try again later.", code="REFUND_RUNNING"
+        ), status=408)
+    except TaskLog.DoesNotExist:
+        return JsonResponse(dict(error=True, code="NOT_FOUND", message=f"Task ID '{task_id}' not found..."), status=404)
+    except Exception as e:
+        return JsonResponse(dict(
+            error=True, code="REFUND_ERROR",
+            message=f"An exception occurred during the refund attempt: {type(e)} {str(e)}"
+        ), status=500)
 
 
 def refund_deposits(request):
@@ -159,6 +246,8 @@ class CustomAdmin(AdminSite):
             path('add_coin_pair/', AddCoinPairView.as_view(), name='easy_add_pair'),
             path('refund_deposits/', refund_deposits, name='refund_deposits'),
             path('_clear_cache/', clear_cache, name='clear_cache'),
+            path('refund/create/', celery_refund_deposit, name='send_refund'),
+            path('refund/<int:task_id>/', celery_check_refund, name='check_refund'),
         ]
         return _urls + urls
 

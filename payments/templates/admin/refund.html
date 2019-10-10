@@ -20,11 +20,11 @@
     <ul id="refund-messages" class="messagelist">
 
     </ul>
-    <form method="POST" action="{% url 'admin:refund_deposits' %}" id="refund-form">
+    <form method="POST" onsubmit="return false;" id="refund-form">
         {% csrf_token %}
         <ul>
         {% for obj in deposits %}
-            <li>Refund {{ obj.amount }} {{ obj.coin_symbol }} to {{ obj.from_account }}
+            <li>(Deposit ID: {{ obj.id }}) Refund {{ obj.rounded_amount }} {{ obj.coin_symbol }} to {{ obj.from_account }}
                 (Current Status: {{ obj.get_status_display }})</li>
             <input type="hidden" name="objects[]" value="{{ obj.pk }}"/>
         {% endfor %}
@@ -39,22 +39,130 @@
         </div>
     </form>
     <script type="application/javascript">
-        var d = document.querySelector('#refund-button');
+        var sb_btn = document.querySelector('#refund-button');
+        var deposit_list = [];
+        {% for d in deposits %}
+            deposit_list.push({{ d.id }});
+        {% endfor %}
+
+        function getCookie(name) {
+            var cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                var cookies = document.cookie.split(';');
+                for (var i = 0; i < cookies.length; i++) {
+                    var cookie = cookies[i].trim();
+                    // Does this cookie string begin with the name we want?
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        const csrftoken = getCookie('csrftoken');
+
+        function insert_message(status, message) {
+            const msgs = document.querySelector('#refund-messages');
+            msgs.innerHTML = msgs.innerHTML + `<li class="${status}">${message}</li>`;
+        }
+        async function wait_refund(task_id) {
+            console.log('wait_refund', task_id);
+
+            try {
+                const j = await getData(`/admin/refund/${task_id}/`);
+                if (j.error) {
+                    if (j.code === "REFUND_RUNNING") {
+                        console.log(`Queried refund status for task ID ${task_id} - not ready yet.`);
+                        setTimeout(() => wait_refund(task_id), 10000);
+                        return;
+                    }
+                    insert_message(
+                        'error',
+                        `Error while querying status for refund task ${task_id}: ${j.message}`
+                    );
+                    return;
+                }
+                const refund = j.refund_data;
+                const amt = `${refund.amount} ${refund.coin}`;
+                const dep = j.deposit;
+                insert_message('success', `Refunded ${amt} from account ${dep.to_account} to ${dep.from_account} ` +
+                                          `Memo: "${dep.refund_memo}", TXID: ${dep.refund_txid}`)
+            } catch (error) {
+                insert_message(
+                    'error',
+                    `Error while querying status for refund task ${task_id}: ${error.message}`
+                );
+            }
+        }
+        async function create_refund(deposit_id) {
+            console.log('create_refund', deposit_id);
+            try {
+                const j = await postData('{% url 'admin:send_refund' %}', {deposit_id: deposit_id});
+                if (j.error) {
+                    insert_message(
+                        'error',
+                        `Error while submitting refund request for deposit ${deposit_id}: ${j.message}`
+                    );
+                    return;
+                }
+                insert_message('success', `Requested refund for deposit ID ${deposit_id} - please wait...`);
+                wait_refund(j.id)
+            } catch(error) {
+                insert_message(
+                    'error',
+                    `Error while submitting refund request for deposit ${deposit_id}: ${error.message}`
+                )
+            }
+        }
+
+        async function getData(url = '') {
+            // Default options are marked with *
+            const response = await fetch(url, {
+                method: 'GET',
+                mode: 'same-origin',
+                cache: 'no-cache', // *default, no-cache, reload, force-cache, only-if-cached
+                credentials: 'same-origin', // include, *same-origin, omit
+                redirect: 'follow', // manual, *follow, error
+                referrer: 'no-referrer' // no-referrer, *client
+            });
+            return await response.json(); // parses JSON response into native JavaScript objects
+        }
+        async function postData(url = '', data = {}) {
+            // Default options are marked with *
+            const response = await fetch(url, {
+                method: 'POST', // *GET, POST, PUT, DELETE, etc.
+                mode: 'cors', // no-cors, *cors, same-origin
+                cache: 'no-cache', // *default, no-cache, reload, force-cache, only-if-cached
+                credentials: 'same-origin', // include, *same-origin, omit
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrftoken
+                },
+                redirect: 'follow', // manual, *follow, error
+                referrer: 'no-referrer', // no-referrer, *client
+                body: JSON.stringify(data)
+            });
+            return await response.json(); // parses JSON response into native JavaScript objects
+        }
+
         window.btnclickfn = function (e) {
             e.preventDefault();
             var conf = confirm('Warning: This will attempt to refund all of the above. Are you sure?');
             if (!conf) {
                 return false;
             }
-            d.removeEventListener('click', window.btnclickfn, true);
-            d.removeEventListener('click', window.btnclickfn, false);
+            sb_btn.removeEventListener('click', window.btnclickfn, true);
+            sb_btn.removeEventListener('click', window.btnclickfn, false);
 
-            var msgs = document.querySelector('#refund-messages');
-            msgs.innerHTML = msgs.innerHTML + `<li class="success">Sending refunds... Please wait, this make take
-more than 30 seconds, depending on how many refunds there are.</li>`;
-            d.click();
-            d.disabled = true;
+            insert_message('success', 'Sending refunds... Please wait, this make take more than 30 seconds, depending' +
+                                      ' on how many refunds there are.');
+            sb_btn.disabled = true;
+
+            deposit_list.map((value, index, arr) => create_refund(value));
+
         };
-        window.btnclick = d.addEventListener('click', window.btnclickfn)
+        window.btnclick = sb_btn.addEventListener('click', window.btnclickfn)
     </script>
 {% endblock %}

@@ -97,7 +97,17 @@ def auto_refund(deposit_id: int, last_error: str = None):
         return None
     
     raise CTCException(last_error)
-    
+
+
+@app.task
+def refund(deposit_id: int, reason="Refund from SteemEngine"):
+    deposit = Deposit.objects.get(id=deposit_id)
+    with transaction.atomic():
+        with LockMgr(f'auto_refund:{deposit_id}'):
+            log.info(f'Attempting to refund {deposit.coin} to sender.')
+            dep, refund_data = ConvertCore.refund_sender(deposit=deposit, reason=reason)
+            return dict(deposit_id=dep.id, refund_data=dict(refund_data))
+
 
 @app.task
 def handle_errors(request: Context, exc, traceback, deposit_id):
@@ -120,7 +130,7 @@ def handle_errors(request: Context, exc, traceback, deposit_id):
         return
     if ex_type is ConvertError:
         log.error('ConvertError while running %s - Deposit: "%s" !!! Message: %s', tname, d, str(e))
-        if '.check_deposit' in request['task']:
+        if '.check_deposit' in tname:
             # Fire off to auto_refund which will automatically refund the deposit if enabled, otherwise will set the
             # error state on the deposit with the error reason.
             background_task(

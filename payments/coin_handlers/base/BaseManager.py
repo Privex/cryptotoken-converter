@@ -48,6 +48,7 @@ class BaseManager(ABC):
         self.log = logging.getLogger(__name__)
 
         # The Coin object matching the `symbol`
+        self.log.debug('Getting Coin for symbol %s', symbol)
         self.coin = Coin.objects.get(symbol=symbol, enabled=True)
         self.symbol = self.coin.symbol_id.upper()
         """The native coin symbol, e.g. BTC, LTC, etc. (non-unique)"""

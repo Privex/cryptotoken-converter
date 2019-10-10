@@ -37,6 +37,7 @@ from django.conf import settings
 
 # Create your models here.
 from django.utils import timezone
+from privex.helpers import dec_round
 
 from steemengine.helpers import empty, is_encrypted, encrypt_str
 
@@ -375,6 +376,10 @@ class Deposit(models.Model):
     @property
     def coin_symbol(self):
         return self.coin.symbol
+    
+    @property
+    def rounded_amount(self):
+        return str(dec_round(self.amount, dp=5))
 
     def __str__(self):
         return 'ID: {}, Coin: {}, TXID: {}'.format(self.id, self.coin, self.txid)
