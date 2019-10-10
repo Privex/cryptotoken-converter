@@ -28,3 +28,10 @@ class ConvertInvalid(CTCException):
     Generally user's fault. Deposit should set to inv, and save exception msg
     """
     pass
+
+
+class NotRefunding(CTCException):
+    """
+    Raised when a refund was skipped due to various reasons e.g. it was already refunded.
+    """
+    pass

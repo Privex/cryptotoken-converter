@@ -12,7 +12,7 @@ from django.utils import timezone
 
 from payments.coin_handlers import get_manager
 from payments.coin_handlers.base import AccountNotFound, NotEnoughBalance
-from payments.exceptions import ConvertError, ConvertInvalid
+from payments.exceptions import ConvertError, ConvertInvalid, NotRefunding
 from payments.models import Deposit, CoinPair, Conversion, Coin, AddressAccountMap
 from steemengine.helpers import empty
 import logging
@@ -99,9 +99,9 @@ def refund_sender(deposit: Deposit, reason: str = None, return_to: str = None) -
 
     log.info(f'Refunding Deposit {d} due to reason: {reason}')
     if d.status == 'refund':
-        raise ConvertError(f'The deposit {d} is already refunded!')
+        raise NotRefunding(f'The deposit {d} is already refunded!')
     if d.status == 'conv':
-        raise ConvertError(f'The deposit {d} is already successfully converted!')
+        raise NotRefunding(f'The deposit {d} is already successfully converted!')
 
     c = d.coin
     sym = c.symbol.upper()

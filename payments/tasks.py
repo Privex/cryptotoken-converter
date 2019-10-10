@@ -10,7 +10,7 @@ from privex.helpers import is_true, empty
 
 from payments.coin_handlers import get_manager, has_loader, get_loaders, BaseLoader
 from payments.coin_handlers.base import SettingsMixin
-from payments.exceptions import ConvertError, ConvertInvalid, CTCException
+from payments.exceptions import ConvertError, ConvertInvalid, CTCException, NotRefunding
 from payments.lib import ConvertCore
 from payments.models import Deposit, CoinPair, Coin, TaskLog
 from steemengine.celery import app
@@ -120,6 +120,10 @@ def handle_errors(request: Context, exc, traceback, deposit_id):
     if ex_type is Locked:
         log.warning('Ran into lock while running %s - will try again later...', tname)
         return
+    if ex_type is NotRefunding:
+        log.warning('Tried running %s - but refund was skipped because: %s', tname, str(exc))
+        return
+
     d = Deposit.objects.get(id=deposit_id)
     e = exc
     if ex_type is ConvertInvalid:
