@@ -30,6 +30,8 @@ import json
 import logging
 from datetime import timedelta
 
+from celery.result import AsyncResult
+from django_celery_results.models import TaskResult
 from django.db import models
 from django.conf import settings
 
@@ -440,5 +442,87 @@ class Conversion(models.Model):
         return f'Conversion ID {self.id} - From: {self.from_coin} to {self.to_coin} (Destination: {self.to_address})'
 
 
+class TaskLog(models.Model):
+    deposit = models.ForeignKey(Deposit, on_delete=models.CASCADE, blank=True, null=True)
+    conversion = models.ForeignKey(Conversion, on_delete=models.CASCADE, blank=True, null=True)
+    action = models.CharField('Task Method being ran', max_length=255)
+    """Generally the full module path to the task function/method, e.g. ``payments.tasks.check_deposit``"""
+    task_read = models.BooleanField("Has the task been loaded and output/errors handled?", default=False)
+    queued_by = models.CharField('What/who queued this task?', max_length=255, blank=True, null=True)
+    """Generally the function/method name which queued the task"""
+    metadata = models.TextField('Task Metadata (JSON)', max_length=2000, default='{}')
+    """Any additional metadata about the task, in JSON format"""
+    error_log = models.TextField(max_length=2000, blank=True, null=True)
+    """If any errors occurred while loading the task, they may be logged in this column"""
+    
+    task_id = models.CharField('Celery Task ID', max_length=255)
+    """The task ID as returned by Celery, e.g. ``aed5fe3e-0051-442f-85ca-fe00a9693b78``"""
+    
+    @property
+    def celery_task(self) -> TaskResult:
+        return TaskResult.objects.get(task_id=self.task_id)
+    
+    @property
+    def status(self) -> str:
+        return self.celery_task.status
 
+    @property
+    def task_args(self) -> str:
+        return self.celery_task.task_args
 
+    @property
+    def task_kwargs(self) -> str:
+        return self.celery_task.task_kwargs
+    
+    @property
+    def result(self):
+        return self.celery_task.result
+    
+    def res_get(self) -> AsyncResult:
+        """
+        Helper method which returns the :class:`AsyncResult` object for this TaskLog object.
+        
+        Example:
+        
+            >>> x = TaskLog(action='a.b.c', task_id='aed5fe3e-0051-442f-85ca-fe00a9693b78')
+            >>> a_res = x.res_get()
+            >>> a_res.status
+            'SUCCESS'
+        
+        :return AsyncResult res: A :class:`.AsyncResult` object for the celery task in this TaskLog model
+        """
+        return AsyncResult(id=self.task_id)
+    
+    def task_get(self, timeout: float = None, propagate: bool = True, interval: float = 0.5, **kwargs):
+        """
+        Helper method which calls and returns the output of :py:meth:`celery.result.AsyncResult.get`
+        using the :class:`AsyncResult` object for this TaskLog.
+        
+        If there were any exceptions while running the task in the background, they will be thrown when this is called,
+        unless you pass ``propagate=False``
+        
+        Any additional kwargs will be forwarded to the ``get`` method.
+        
+        :param float  timeout: How long to wait, in seconds, before the operation times out.
+        :param bool propagate: Re-raise exception if the task failed.
+        :param float interval: Seconds to wait before retrying to retrieve the result. Note that this does not have any
+                               effect when using the RPC/redis result store backends, as they don't use polling.
+        :param Any     kwargs: Any additional keyword args will be forwarded onto ``get()``.
+        
+        :raises celery.exceptions.TimeoutError: When ``timeout`` is not None and waiting for result took too long.
+        
+        :return Any result: The result from your task.
+        """
+        return self.res_get().get(timeout=timeout, propagate=propagate, interval=interval, **kwargs)
+    
+    # The date/time that this database entry was added/updated
+    created_at = models.DateTimeField('Creation Time', auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField('Last Update', auto_now=True)
+
+    def __str__(self):
+        try:
+            status = self.status
+        except TaskResult.DoesNotExist:
+            status = None
+        return f'<TaskLog id={self.id} action="{self.action}" by="{self.queued_by}" read={self.task_read} ' + \
+               f'status={status} />'

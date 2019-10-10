@@ -64,7 +64,7 @@ from steemengine.helpers import random_str
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-dotenv.read_dotenv(os.path.join(BASE_DIR, '.env'))
+dotenv.load_dotenv(os.path.join(BASE_DIR, '.env'))
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = env('SECRET_KEY', None)
@@ -142,6 +142,13 @@ else:
     if EMAIL_BACKEND == 'django.core.mail.backends.smtp.EmailBackend':
         EMAIL_BACKEND = 'django.core.mail.backends.dummy.EmailBackend'
 
+####
+# Celery settings
+####
+
+CELERY_RESULT_BACKEND = env('CELERY_RESULT_BACKEND', 'django-db')
+CELERY_CACHE_BACKEND = env('CELERY_CACHE_BACKEND', 'django-cache')
+
 # Application definition
 
 INSTALLED_APPS = [
@@ -154,6 +161,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'rest_framework',
     'django_filters',
+    'django_celery_results',
     'lockmgr',   # Privex's django-lockmgr package
     'payments',
 ]
