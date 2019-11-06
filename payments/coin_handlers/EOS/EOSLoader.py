@@ -20,6 +20,7 @@ class EOSLoader(BaseLoader, EOSMixin):
         super(EOSLoader, self).__init__(symbols=symbols)
         self.tx_count = 1000
         self.loaded = False
+        self.current_rpc = None
 
     def load(self, tx_count=1000):
         """

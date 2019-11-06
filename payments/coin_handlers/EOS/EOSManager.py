@@ -22,6 +22,10 @@ class EOSManager(BaseManager, EOSMixin):
 
     can_issue = True
 
+    def __init__(self, symbol: str):
+        super().__init__(symbol)
+        self.current_rpc = None
+
     def address_valid(self, *addresses: str) -> bool:
         """
         Check if one or more account usernames exist on the EOS network.
