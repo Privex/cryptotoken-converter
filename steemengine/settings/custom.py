@@ -88,6 +88,7 @@ COIN_HANDLERS = env_csv('COIN_HANDLERS', [
     'Bitcoin',
     'Steem',
     'EOS',
+    'Telos',
     'Bitshares',
     'Appics',
 ])

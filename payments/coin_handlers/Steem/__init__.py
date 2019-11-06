@@ -83,7 +83,7 @@ def reload():
         settings.COIN_TYPES += (('steembase', 'Steem Network (or compatible fork)',),)
 
     # Grab a simple list of coin symbols with the type 'bitcoind' to populate the provides lists.
-    provides = Coin.objects.filter(coin_type='steembase').values_list('symbol', flat=True)
+    provides = Coin.objects.filter(enabled=True, coin_type='steembase').values_list('symbol', flat=True)
     SteemLoader.provides = provides
     SteemManager.provides = provides
 

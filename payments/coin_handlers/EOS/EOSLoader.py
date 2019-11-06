@@ -29,7 +29,8 @@ class EOSLoader(BaseLoader, EOSMixin):
         :param tx_count: Amount of transactions to load per account, most recent first
         :return: None
         """
-        log.info('Loading EOS transactions...')
+        chain = self.chain.upper()
+        log.info('Loading %s transactions...', chain)
 
         self.tx_count = tx_count
         # This just forces self.settings to be loaded before we loop over self.coins
@@ -41,19 +42,21 @@ class EOSLoader(BaseLoader, EOSMixin):
             symbol = symbol.upper()
             try:
                 if empty(coin.our_account):
-                    raise AccountNotFound(f'EOS token "{coin}" has blank `our_account`. Refusing to load TXs.')
+                    raise AccountNotFound(
+                        f'{chain} token "{coin}" has blank `our_account`. Refusing to load TXs.'
+                    )
                 self.get_contract(symbol)
             except Exception as e:
-                log.warning(f'Refusing to load TXs for EOS token "{coin}". Reason: {type(e)} - {str(e)}')
+                log.warning(f'Refusing to load TXs for {chain} token "{coin}". Reason: {type(e)} - {str(e)}')
             else:
-                log.debug(f'EOS token with symbol "{coin}" passed tests. Has non-empty our_account and contract.')
+                log.debug(f'{chain} token with symbol "{coin}" passed tests. Has non-empty our_account and contract.')
                 safe = True
             # If a token didn't pass basic sanity checks (has our account + contract), remove it from coins and symbols.
             if not safe:
                 log.debug(f'Removing symbol "{symbol}" from self.coins and self.symbols...')
                 del self.coins[symbol]
                 self.symbols = [s for s in self.symbols if s != symbol]
-        log.debug('Remaining EOSLoader symbols that were not disabled: %s', self.symbols)
+        log.debug('Remaining %s symbols that were not disabled: %s', __name__, self.symbols)
         self.loaded = True
 
     def list_txs(self, batch=100) -> Generator[dict, None, None]:
@@ -66,11 +69,21 @@ class EOSLoader(BaseLoader, EOSMixin):
         """
         if not self.loaded:
             self.load()
+        chain = self.chain.upper()
 
         for symbol, c in self.coins.items():
             try:
+                # If a specific EOS/TELOS token has a different RPC, then it may be on a different chain and we
+                # need to switch over our RPC.
+                coin_rpc = c.settings['host']
+                if not empty(self.current_rpc):
+                    if empty(coin_rpc) and self.setting_defaults['host'] not in self.current_rpc:
+                        self.replace_eos(**self.eos_settings)
+                    elif not empty(coin_rpc) and coin_rpc not in self.current_rpc:
+                        self.replace_eos(**{**c.settings, **c.settings['json']})
+
                 sym = c.symbol_id.upper()
-                log.debug(f'Loading EOS actions for token "{sym}", received to "{c.our_account}"')
+                log.debug(f'Loading {chain} actions for token "{sym}", received to "{c.our_account}"')
                 actions = self.get_actions(c.our_account, self.tx_count)
                 yield from self.clean_txs(c.our_account, sym, self.get_contract(sym), actions)
             except:
@@ -144,11 +157,11 @@ class EOSLoader(BaseLoader, EOSMixin):
         :param count:    Amount of transactions to load
         :return list transactions: A list of EOS transactions as dict's
         """
-        cache_key = f'eos_actions:{account}'
+        cache_key = f'{self.chain}_actions:{account}'
         actions = cache.get(cache_key)
 
         if empty(actions):
-            log.info('Loading EOS actions for %s from node %s', account, self.url)
+            log.info('Loading %s actions for %s from node %s', self.chain.upper(), account, self.url)
             c = self.eos
             data = c.get_actions(account, pos=-1, offset=-count)
             actions = data['actions']

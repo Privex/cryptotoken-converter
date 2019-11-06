@@ -52,7 +52,7 @@ def reload():
         settings.COIN_TYPES += (('bitshares', 'Bitshares Token',),)
 
     # Grab a simple list of coin symbols with the type 'bitshares' to populate the provides lists.
-    provides = Coin.objects.filter(coin_type='bitshares').values_list('symbol', flat=True)
+    provides = Coin.objects.filter(enabled=True, coin_type='bitshares').values_list('symbol', flat=True)
     BitsharesLoader.provides = provides
     BitsharesManager.provides = provides
 

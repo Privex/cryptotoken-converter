@@ -42,7 +42,8 @@ class EOSManager(BaseManager, EOSMixin):
                     log.warning(f'"account_name" not in data returned by eos.get_account("{address}")...')
                     return False
             except HTTPError as e:
-                log.info(f'HTTPError while verifying EOS account "{address}" - this is probably normal: {str(e)}')
+                log.info(f'HTTPError while verifying {self.chain.upper()} account "{address}" '
+                         f'- this is probably normal: {str(e)}')
                 return False
         return True
 
@@ -58,7 +59,7 @@ class EOSManager(BaseManager, EOSMixin):
         """
         for address in addresses:
             if not self.address_valid(address):
-                raise AccountNotFound(f'The EOS account "{address}" does not exist...')
+                raise AccountNotFound(f'The {self.chain.upper()} account "{address}" does not exist...')
         return True
 
     def get_deposit(self) -> tuple:
@@ -69,14 +70,15 @@ class EOSManager(BaseManager, EOSMixin):
             address = self.coin.our_account
 
         if not empty(memo):
-            raise NotImplemented('Filtering by memos not implemented yet for EOSManager!')
+            raise NotImplemented(f'Filtering by memos not implemented yet for {__name__}!')
         sym = self.symbol
 
         contract = self.get_contract(sym)
 
         bal = self.eos.get_currency_balance(address, code=contract, symbol=sym)
         if len(bal) < 1:
-            raise TokenNotFound(f'Balance list for EOS symbol {sym} with contract {contract} was empty...')
+            raise TokenNotFound(f'Balance list for {self.chain.upper()} symbol {sym} with '
+                                f'contract {contract} was empty...')
 
         amt, curr = bal[0].split()
         amt = Decimal(amt)
@@ -177,14 +179,14 @@ class EOSManager(BaseManager, EOSMixin):
         tx_bin = self.eos.abi_json_to_bin(payload['account'], payload['name'], tx_args)
         payload['data'] = tx_bin['binargs']
         trx = dict(actions=[payload])
-        log.debug(f'Full EOS payload: {trx} Tx Bin: {tx_bin}')
+        log.debug(f'Full {self.chain.upper()} payload: {trx} Tx Bin: {tx_bin}')
         trx['expiration'] = str((datetime.utcnow() + timedelta(seconds=60)).replace(tzinfo=pytz.UTC))
         # Sign and broadcast the transaction we've just built
         tfr = self.eos.push_transaction(trx, priv_key, broadcast=broadcast)
         return tfr
 
-    @staticmethod
-    def get_privkey(from_account: str, key_types: list = None) -> Tuple[str, str]:
+    @classmethod
+    def get_privkey(cls, from_account: str, key_types: list = None) -> Tuple[str, str]:
         """
         Find the EOS :py:class:`models.CryptoKeyPair` in the database for a given account `from_account` ,
         decrypt the private key, then returns a tuple containing (key_type:str, priv_key:str,)
@@ -212,9 +214,10 @@ class EOSManager(BaseManager, EOSMixin):
 
         key_types = ['active', 'owner'] if key_types is None else key_types
 
-        kp = CryptoKeyPair.objects.filter(network='eos', account=from_account, key_type__in=key_types)
+        kp = CryptoKeyPair.objects.filter(network=cls.chain_type, account=from_account, key_type__in=key_types)
         if len(kp) < 1:
-            raise AuthorityMissing(f'No private key found for EOS account {from_account} matching types: {key_types}')
+            raise AuthorityMissing(f'No private key found for {cls.chain.upper()} '
+                                   f'account {from_account} matching types: {key_types}')
 
         # Grab the first key pair we've found, and decrypt the private key into plain text
         priv_key = decrypt_str(kp[0].private_key)
@@ -250,11 +253,11 @@ class EOSManager(BaseManager, EOSMixin):
         # If we get passed a float for some reason, make sure we trim it to the token's precision before
         # converting it to a Decimal.
         if type(amount) == float:
-            amount = '{0:.4f}'.format(amount)
+            amount = ('{0:.' + self.settings[self.symbol].get('precision', 4) + 'f}').format(amount)
 
         amount = Decimal(amount)
         if amount < Decimal('0.0001'):
-            raise ArithmeticError(f'Amount {amount} is lower than minimum of 0.0001 EOS, cannot send.')
+            raise ArithmeticError(f'Amount {amount} is lower than minimum of 0.0001 {self.symbol}, cannot send.')
 
         if from_account is not None:
             our_bal = self.balance(from_account)

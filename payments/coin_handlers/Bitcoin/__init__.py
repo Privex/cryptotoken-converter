@@ -106,7 +106,7 @@ def reload():
         settings.COIN_TYPES += (('bitcoind', 'Bitcoind RPC compatible crypto',),)
 
     # Grab a simple list of coin symbols with the type 'bitcoind' to populate the provides lists.
-    provides = Coin.objects.filter(coin_type='bitcoind').values_list('symbol', flat=True)
+    provides = Coin.objects.filter(enabled=True, coin_type='bitcoind').values_list('symbol', flat=True)
     BitcoinLoader.provides = provides
     BitcoinManager.provides = provides
     # Since the handler is re-loading, we wipe the settings cache to ensure stale connection details aren't used.
