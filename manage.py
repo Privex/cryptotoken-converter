@@ -19,7 +19,12 @@ import dotenv
 """
 if __name__ == '__main__':
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'steemengine.settings')
-    dotenv.load_dotenv()
+    # Deal with the issue of conflicting dotenv packages by trying both methods...
+    try:
+        dotenv.load_dotenv()
+    except AttributeError:
+        dotenv.read_dotenv()
+    
     try:
         from django.core.management import execute_from_command_line
     except ImportError as exc:

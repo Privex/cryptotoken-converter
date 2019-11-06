@@ -64,7 +64,11 @@ from steemengine.helpers import random_str
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-dotenv.load_dotenv(os.path.join(BASE_DIR, '.env'))
+# Deal with the issue of conflicting dotenv packages by trying both methods...
+try:
+    dotenv.load_dotenv(os.path.join(BASE_DIR, '.env'))
+except AttributeError:
+    dotenv.read_dotenv(os.path.join(BASE_DIR, '.env'))
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = env('SECRET_KEY', None)
