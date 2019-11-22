@@ -77,8 +77,15 @@ class EOSLoader(BaseLoader, EOSMixin):
                 # If a specific EOS/TELOS token has a different RPC, then it may be on a different chain and we
                 # need to switch over our RPC.
                 coin_rpc = c.settings['host']
+                
+                # Use the database eos_settings host if it's set. Otherwise fall back to the default.
+                default_rpc = self.setting_defaults['host']
+                default_rpc = default_rpc if empty(self.eos_settings.get('host')) else self.eos_settings['host']
+                
                 if not empty(self.current_rpc):
-                    if empty(coin_rpc) and self.setting_defaults['host'] not in self.current_rpc:
+                    # If this coin doesn't have a specific RPC, then use the default (eos_settings or class default)
+                    # Otherwise, use the coin's own RPC settings.
+                    if empty(coin_rpc) and default_rpc not in self.current_rpc:
                         self.replace_eos(**self.eos_settings)
                     elif not empty(coin_rpc) and coin_rpc not in self.current_rpc:
                         self.replace_eos(**{**c.settings, **c.settings['json']})
