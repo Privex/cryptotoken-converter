@@ -16,7 +16,7 @@ class TelosMixin(EOSMixin):
     
     setting_defaults = dict(
         host='telos.caleos.io', username=None, password=None, endpoint='/', port=443, ssl=True, precision=4,
-        telos=True
+        telos=True, load_method='actions', history_url='',
     )
     
     _telos = None  # type: Cleos
