@@ -112,7 +112,8 @@ class EOSLoader(BaseLoader, EOSMixin):
                     yield from self.pvx_clean_txs(c.our_account, sym, self.get_contract(sym), actions)
                 else:
                     log.debug(f'Loading {chain} actions for token "{sym}", received to "{c.our_account}"')
-                    actions = self.get_actions(c.our_account, self.tx_count)
+                    # actions = self.get_actions(c.our_account, self.tx_count)
+                    actions = self.get_actions(c.our_account, 100)
                     yield from self.clean_txs(c.our_account, sym, self.get_contract(sym), actions)
             except:
                 log.exception('Something went wrong while loading transactions for coin %s. Skipping for now.', c)
