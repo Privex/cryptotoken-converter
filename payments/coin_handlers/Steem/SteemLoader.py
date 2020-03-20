@@ -91,11 +91,11 @@ class SteemLoader(BaseLoader, SteemMixin):
         if not self.loaded:
             self.load()
         for symbol, c in self.coins.items():
-            acc_name = self.coins[symbol].our_account
-            acc = Account(acc_name, steem_instance=self.get_rpc(symbol))
+            acc_name = c.our_account
+            acc = Account(acc_name, steem_instance=self.get_rpc(c.symbol_id))
             # get_account_history returns a generator with automatic batching, so we don't have to worry about batches.
             txs = acc.get_account_history(-1, self.tx_count, only_ops=['transfer'])
-            yield from self.clean_txs(symbol=symbol, transactions=txs, account=acc_name)
+            yield from self.clean_txs(symbol=c.symbol_id, transactions=txs, account=acc_name)
 
     def clean_txs(self, symbol: str, transactions: Iterable[dict], account: str = None) -> Generator[dict, None, None]:
         """
