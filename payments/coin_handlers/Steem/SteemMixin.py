@@ -11,6 +11,17 @@ import logging
 
 log = logging.getLogger(__name__)
 
+custom_chains = {
+    'HIVE': dict(
+        chain_assets=[
+            dict(asset='@@000000013', id=0, precision=3, symbol='HBD'),
+            dict(asset='@@000000021', id=1, precision=3, symbol='HIVE'),
+            dict(asset='@@000000037', id=2, precision=6, symbol='VESTS')
+        ],
+        chain_id="0" * int(256 / 4), min_version='0.23.0', prefix='STM'
+    )
+}
+
 
 class SteemMixin(SettingsMixin):
     """
@@ -57,8 +68,9 @@ class SteemMixin(SettingsMixin):
 
             # If you've specified custom RPC nodes in the custom JSON, make a new instance with those
             # Otherwise, use the global shared_steem_instance.
-            rpc_conf = dict(num_retries=5, num_retries_call=3, timeout=20, node=rpcs)
+            rpc_conf = dict(num_retries=5, num_retries_call=3, timeout=20, node=rpcs, custom_chains=custom_chains)
             log.info('Getting Beem instance for coin %s - settings: %s', symbol, rpc_conf)
+
             self._rpc = shared_steem_instance() if empty(rpcs, itr=True) else Steem(**rpc_conf)  # type: Steem
             self._rpc.set_password_storage(settings.get('pass_store', 'environment'))
             self._rpcs[symbol] = self._rpc
@@ -77,7 +89,7 @@ class SteemMixin(SettingsMixin):
         if symbol not in self._rpcs:
             settings = self.settings[symbol]['json']
             rpcs = settings.get('rpcs')
-            rpc_conf = dict(num_retries=5, num_retries_call=3, timeout=20, node=rpcs)
+            rpc_conf = dict(num_retries=5, num_retries_call=3, timeout=20, node=rpcs, custom_chains=custom_chains)
             log.info('Getting Beem instance for coin %s - settings: %s', symbol, rpc_conf)
             self._rpcs[symbol] = self.rpc if empty(rpcs, itr=True) else Steem(**rpc_conf)
             self._rpcs[symbol].set_password_storage(settings.get('pass_store', 'environment'))
