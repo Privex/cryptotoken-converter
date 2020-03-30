@@ -49,6 +49,7 @@ def mk_seng_rpc(rpc_settings: dict = None, **kwargs) -> SteemEngineToken:
     :keyword str history_node:     The hostname for the history API server, e.g. ``api.steem-engine.com``
     :keyword str history_url:      The URL for the history API e.g. ``accounts/history``
     :keyword str network_account:  The "network account" for SteemEngine, e.g. ``ssc-mainnet1``
+    :keyword str network:          Chain to run on (``steem`` or ``hive``)
     
     :return SteemEngineToken rpc:  An instance of :class:`.SteemEngineToken`
     """
@@ -59,9 +60,11 @@ def mk_seng_rpc(rpc_settings: dict = None, **kwargs) -> SteemEngineToken:
     history_node = rpc_settings.get('history_node', settings.SENG_HISTORY_NODE)
     history_url = rpc_settings.get('history_url', settings.SENG_HISTORY_URL)
     network_account = rpc_settings.get('network_account', settings.SENG_NETWORK_ACCOUNT)
+    network = rpc_settings.get('network', settings.SENG_NETWORK)
 
     return SteemEngineToken(
         network_account=network_account,
+        network=network,
         history_conf=dict(hostname=history_node, url=history_url),
         hostname=rpc_node,
         url=rpc_url

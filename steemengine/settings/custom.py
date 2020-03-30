@@ -72,6 +72,9 @@ SENG_RPC_URL = env('SENG_RPC_URL', '/rpc/contracts')
 SENG_HISTORY_NODE = env('SENG_HISTORY_NODE', 'api.steem-engine.com')
 SENG_HISTORY_URL = env('SENG_HISTORY_URL', 'accounts/history')
 
+# Change to 'hive' to switch privex-steemengine to use beem with Hive RPCs instead of Steem RPCs
+SENG_NETWORK = env('SENG_NETWORK', 'steem')
+
 #########
 # Bitshares Network related settings
 ####

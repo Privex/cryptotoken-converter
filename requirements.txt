@@ -10,14 +10,14 @@ django-cors-headers==2.5.2
 privex-helpers>=1.3.3
 privex-coinhandlers>=1.2.7
 privex-loghelper>=1.0.6
-privex-steemengine>=1.1.3
+privex-steemengine>=1.2.0
 privex-jsonrpc>=1.1.4
 
 mysqlclient>=1.4.2.post1
 psycopg2>=2.7.7 --no-binary psycopg2
 
 requests>=2.21.0
-beem>=0.20.19
+beem>=0.22.11
 bhive>=0.23.0
 python-dateutil>=2.8.0
 gunicorn>=19.9.0
