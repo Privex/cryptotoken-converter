@@ -23,6 +23,8 @@ from typing import Generator, Iterable, List
 
 from dateutil.parser import parse
 from django.core.cache import cache
+from privex.steemengine import SETransaction
+
 from payments.coin_handlers.SteemEngine.SteemEngineMixin import SteemEngineMixin
 from payments.coin_handlers.base.BaseLoader import BaseLoader
 from payments.models import Coin
@@ -89,7 +91,7 @@ class SteemEngineLoader(BaseLoader, SteemEngineMixin):
                 yield tx
             del txs     # At this point, the current batch is exhausted. Destroy the tx array to save memory.
 
-    def clean_txs(self, account: str, symbol: str, transactions: Iterable[dict]) -> Generator[dict, None, None]:
+    def clean_txs(self, account: str, symbol: str, transactions: Iterable[SETransaction]) -> Generator[dict, None, None]:
         """
         Filters a list of transactions by the receiving account, yields dict's conforming with
         :class:`payments.models.Deposit`
@@ -102,25 +104,25 @@ class SteemEngineLoader(BaseLoader, SteemEngineMixin):
         for tx in transactions:
             try:
                 log.debug("Cleaning SENG transaction: %s", tx)
-                if 'from' not in tx or 'to' not in tx:
+                if not tx.sender or not tx.to:
                     log.debug("SENG TX missing from/to - skipping")
                     continue
-                if tx['from'].lower() in ['tokens', 'market']:
+                if tx.sender.lower() in ['tokens', 'market']:
                     log.debug("SENG TX from tokens/market - skipping")
                     continue  # Ignore token issues and market transactions
-                if tx['to'].lower() != account.lower():
+                if tx.to.lower() != account.lower():
                     log.debug("SENG TX is to account '%s' - but we're account '%s' - skipping", tx['to'].lower(), account.lower())
                     continue  # If we aren't the receiver, we don't need it.
                 # Cache the token for 5 mins, so we aren't spamming the token API
                 token = cache.get_or_set('stmeng:'+symbol, lambda: self.get_rpc(symbol).get_token(symbol), 300)
 
-                q = tx['quantity']
+                q = tx.quantity
                 if type(q) == float:
-                    q = ('{0:.' + str(token['precision']) + 'f}').format(tx['quantity'])
-                _txid = tx.get('txid', tx.get('transactionId'))
+                    q = ('{0:.' + str(token['precision']) + 'f}').format(tx.quantity)
+                _txid = tx.raw_data.get('txid', tx.raw_data.get('transactionId'))
                 clean_tx = dict(
                     txid=_txid, coin=self.coins[symbol].symbol, tx_timestamp=convert_datetime(tx['timestamp']),
-                    from_account=tx['from'], to_account=tx['to'], memo=tx['memo'],
+                    from_account=tx.sender, to_account=tx.to, memo=tx.memo,
                     amount=Decimal(q)
                 )
                 yield clean_tx
