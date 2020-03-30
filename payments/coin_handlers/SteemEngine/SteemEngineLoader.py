@@ -101,7 +101,7 @@ class SteemEngineLoader(BaseLoader, SteemEngineMixin):
         """
         for tx in transactions:
             try:
-                log.debug("Cleaning SENG transaction: ", tx)
+                log.debug("Cleaning SENG transaction: %s", tx)
                 if 'from' not in tx or 'to' not in tx:
                     log.debug("SENG TX missing from/to - skipping")
                     continue
