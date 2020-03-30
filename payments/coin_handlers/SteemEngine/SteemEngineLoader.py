@@ -101,9 +101,16 @@ class SteemEngineLoader(BaseLoader, SteemEngineMixin):
         """
         for tx in transactions:
             try:
-                if 'from' not in tx or 'to' not in tx: continue
-                if tx['from'].lower() in ['tokens', 'market']: continue  # Ignore token issues and market transactions
-                if tx['to'].lower() != account.lower(): continue  # If we aren't the receiver, we don't need it.
+                log.debug("Cleaning SENG transaction: ", tx)
+                if 'from' not in tx or 'to' not in tx:
+                    log.debug("SENG TX missing from/to - skipping")
+                    continue
+                if tx['from'].lower() in ['tokens', 'market']:
+                    log.debug("SENG TX from tokens/market - skipping")
+                    continue  # Ignore token issues and market transactions
+                if tx['to'].lower() != account.lower():
+                    log.debug("SENG TX is to account '%s' - but we're account '%s' - skipping", tx['to'].lower(), account.lower())
+                    continue  # If we aren't the receiver, we don't need it.
                 # Cache the token for 5 mins, so we aren't spamming the token API
                 token = cache.get_or_set('stmeng:'+symbol, lambda: self.get_rpc(symbol).get_token(symbol), 300)
 
