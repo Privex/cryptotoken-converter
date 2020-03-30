@@ -110,8 +110,9 @@ class SteemEngineLoader(BaseLoader, SteemEngineMixin):
                 q = tx['quantity']
                 if type(q) == float:
                     q = ('{0:.' + str(token['precision']) + 'f}').format(tx['quantity'])
+                _txid = tx.get('txid', tx.get('transactionId'))
                 clean_tx = dict(
-                    txid=tx['txid'], coin=self.coins[symbol].symbol, tx_timestamp=convert_datetime(tx['timestamp']),
+                    txid=_txid, coin=self.coins[symbol].symbol, tx_timestamp=convert_datetime(tx['timestamp']),
                     from_account=tx['from'], to_account=tx['to'], memo=tx['memo'],
                     amount=Decimal(q)
                 )
