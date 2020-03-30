@@ -209,16 +209,17 @@ class SteemEngineManager(BaseManager, SteemEngineMixin):
         """
 
         try:
-            token = self.eng_rpc.get_token(symbol=self.symbol)
+            rpc = self.get_rpc(self.symbol)
+            token = rpc.get_token(symbol=self.symbol)
 
             # If we get passed a float for some reason, make sure we trim it to the token's precision before
             # converting it to a Decimal.
             if type(amount) == float:
                 amount = ('{0:.' + str(token['precision']) + 'f}').format(amount)
             amount = Decimal(amount)
-            issuer = self.eng_rpc.get_token(self.symbol)['issuer']
-            log.debug('Issuing %f %s to @%s', amount, self.symbol, address)
-            t = self.eng_rpc.issue_token(symbol=self.symbol, to=address, amount=amount)
+            issuer = rpc.get_token(self.symbol)['issuer']
+            log.info('Issuing %f %s to @%s', amount, self.symbol, address)
+            t = rpc.issue_token(symbol=self.symbol, to=address, amount=amount)
             txid = None     # There's a risk we can't get the TXID, and so we fall back to None.
             if 'transaction_id' in t:
                 txid = t['transaction_id']
@@ -275,7 +276,8 @@ class SteemEngineManager(BaseManager, SteemEngineMixin):
                 raise AttributeError("Both 'from_address' and 'coin.our_account' are empty. Cannot send.")
             from_address = self.coin.our_account
         try:
-            token = self.eng_rpc.get_token(symbol=self.symbol)
+            rpc = self.get_rpc(self.symbol)
+            token = rpc.get_token(symbol=self.symbol)
 
             # If we get passed a float for some reason, make sure we trim it to the token's precision before
             # converting it to a Decimal.
@@ -285,8 +287,8 @@ class SteemEngineManager(BaseManager, SteemEngineMixin):
 
             log.debug('Sending %f %s to @%s', amount, self.symbol, address)
 
-            t = self.eng_rpc.send_token(symbol=self.symbol, from_acc=from_address,
-                                        to_acc=address, amount=amount, memo=memo)
+            t = rpc.send_token(symbol=self.symbol, from_acc=from_address,
+                               to_acc=address, amount=amount, memo=memo)
             txid = None  # There's a risk we can't get the TXID, and so we fall back to None.
             if 'transaction_id' in t:
                 txid = t['transaction_id']
@@ -309,18 +311,18 @@ class SteemEngineManager(BaseManager, SteemEngineMixin):
 
     def send_or_issue(self, amount, address, memo=None, trigger_data=None) -> dict:
         try:
-            log.debug(f'Attempting to send {amount} {self.symbol} to {address} ...')
+            log.info(f'Attempting to send {amount} {self.symbol} to {address} ...')
             return self.send(amount=amount, address=address, memo=memo, trigger_data=trigger_data)
         except exceptions.NotEnoughBalance:
             acc = self.coin.our_account
-            log.debug(f'Not enough balance. Issuing {amount} {self.symbol} to our account {acc} ...')
+            log.info(f'Not enough balance. Issuing {amount} {self.symbol} to our account {acc} ...')
 
             # Issue the coins to our own account, and then send them. This prevents problems caused when issuing
             # directly to third parties.
             self.issue(amount=amount, address=acc, memo=f"Issuing to self before transfer to {address}",
                        trigger_data=trigger_data)
 
-            log.debug(f'Sending newly issued coins: {amount} {self.symbol} to {address} ...')
+            log.info(f'Sending newly issued coins: {amount} {self.symbol} to {address} ...')
             tx = self.send(amount=amount, address=address, memo=memo, from_address=acc, trigger_data=trigger_data)
             # So the calling function knows we had to issue these coins, we change the send_type back to 'issue'
             tx['send_type'] = 'issue'
