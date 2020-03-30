@@ -26,6 +26,7 @@ from django.core.cache import cache
 from payments.coin_handlers.SteemEngine.SteemEngineMixin import SteemEngineMixin
 from payments.coin_handlers.base.BaseLoader import BaseLoader
 from payments.models import Coin
+from privex.helpers import convert_datetime
 from steemengine.helpers import empty
 
 log = logging.getLogger(__name__)
@@ -100,6 +101,7 @@ class SteemEngineLoader(BaseLoader, SteemEngineMixin):
         """
         for tx in transactions:
             try:
+                if 'from' not in tx or 'to' not in tx: continue
                 if tx['from'].lower() in ['tokens', 'market']: continue  # Ignore token issues and market transactions
                 if tx['to'].lower() != account.lower(): continue  # If we aren't the receiver, we don't need it.
                 # Cache the token for 5 mins, so we aren't spamming the token API
@@ -109,7 +111,7 @@ class SteemEngineLoader(BaseLoader, SteemEngineMixin):
                 if type(q) == float:
                     q = ('{0:.' + str(token['precision']) + 'f}').format(tx['quantity'])
                 clean_tx = dict(
-                    txid=tx['txid'], coin=self.coins[symbol].symbol, tx_timestamp=parse(tx['timestamp']),
+                    txid=tx['txid'], coin=self.coins[symbol].symbol, tx_timestamp=convert_datetime(tx['timestamp']),
                     from_account=tx['from'], to_account=tx['to'], memo=tx['memo'],
                     amount=Decimal(q)
                 )
