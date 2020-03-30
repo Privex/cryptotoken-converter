@@ -99,6 +99,30 @@ class DRFNoCSRF(SessionAuthentication):
 
 
 class ConvertAPI(APIView):
+    """
+    Required form / JSON fields:
+    
+     * ``from_coin`` - The API coin symbol to convert from (send this coin)
+     * ``to_coin`` - The API coin symbol to convert into (we send you this coin)
+     * ``destination`` - The account / address to send to
+    
+    Optional:
+    
+     * ``dest_memo`` - For coins that support memos, you can specify a custom memo to use when sending.
+    
+    Example (application/json)
+    
+    .. code-block:: json
+        
+        {"from_coin": "BTC", "to_coin": "BTCP", "destination": "someguy123"}
+    
+    Example (application/x-www-form-urlencoded)::
+        
+        from_coin=BTC&to_coin=BTCP&destination=someguy123
+    
+    
+    
+    """
     authentication_classes = (DRFNoCSRF,)
 
     def post(self, request: Request):
