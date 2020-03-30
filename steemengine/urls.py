@@ -25,7 +25,7 @@ from django.contrib import admin
 from django.urls import path, include, re_path
 from rest_framework import routers
 
-from payments.views import IndexView, DepositAPI, CoinAPI, ConvertAPI, CoinPairAPI, ConversionAPI, api_root
+from payments.views import IndexView, DepositAPI, CoinAPI, ConvertAPI, CoinPairAPI, ConversionAPI, api_root, ConvertView
 from payments.admin import ctadmin
 
 
@@ -42,6 +42,7 @@ admin.autodiscover()
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('convert/', ConvertView.as_view(), name='convert_view'),
     path('api/convert/', ConvertAPI.as_view(), name='start_convert'),
     re_path(r'^api/$', api_root),
     path('api/', include(router.urls)),

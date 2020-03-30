@@ -37,6 +37,10 @@ class IndexView(TemplateView):
     template_name = 'base.html'
 
 
+class ConvertView(TemplateView):
+    template_name = 'convert.html'
+
+
 @api_view(['GET'])
 def api_root(request, format=None):
     return Response({

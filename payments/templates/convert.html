@@ -1,0 +1,120 @@
+{% extends 'base.html' %}
+{% block content %}
+    <div class="ui raised segment" id="mainbox">
+        {% verbatim %}
+        <div class="ui message error" v-if="error">{{ error }}</div>
+        <div class="ui form">
+            <label for="from_coin">Convert From</label><br/>
+            <select name="from_coin" id="from_coin" v-model="from_coin">
+                <option v-for="p of coins" :value="p.symbol">{{ p.display_name }} ({{ p.symbol }})</option>
+            </select><br/>
+
+            <label for="to_coin">Convert To</label><br/>
+            <select name="to_coin" id="to_coin" v-model="to_coin">
+                <option v-for="p of coins" :value="p.symbol">{{ p.display_name }} ({{ p.symbol }})</option>
+            </select>
+            <br/>
+
+            <label for="destination">Send {{ to_coin }} to this address/account:</label><br/>
+            <input type="text" v-model="destination" class="ui input"/><br/>
+
+            <label for="dest_memo">Destination memo (if applicable):</label><br/>
+            <input type="text" v-model="dest_memo" class="ui input"/><br/>
+
+            <button v-on:click="get_deposit()" class="ui button primary">Get Deposit Info</button>
+        </div>
+
+        <div class="ui raised segment" v-if="deposit_address">
+            <strong>Deposit {{ from_coin }} to this Address:</strong>
+            <pre>{{ deposit_address }}</pre>
+        </div>
+        <div class="ui raised segment" v-if="deposit_account">
+            <strong>Deposit {{ from_coin }} to this Account:</strong>
+            <pre>{{ deposit_account }}</pre>
+        </div>
+        <div class="ui raised segment" v-if="deposit_memo">
+            <strong>Use this Memo in your transfer:</strong>
+            <pre>{{ deposit_memo }}</pre>
+        </div>
+        {% endverbatim %}
+    </div>
+    <script src="https://cdn.privex.io/lib/vue/2.6.10/vue.min.js"
+            integrity="sha384-8t+aLluUVnn5SPPG/NbeZCH6TWIvaXIm/gDbutRvtEeElzxxWaZN+G/ZIEdI/f+y"
+            crossorigin="anonymous"></script>
+
+    <script>
+
+        var app = new Vue({
+            el: '#mainbox',
+            data: {
+                error: null,
+                pairs: [],
+                coins: [],
+                from_coin: null,
+                to_coin: null,
+                destination: '',
+                dest_memo: '',
+                deposit_address: null,
+                deposit_account: null,
+                deposit_memo: null,
+            },
+            methods: {
+                load_coins() {
+                    fetch('/api/coins', {
+                        method: 'GET',
+                        headers: {'Content-Type': 'application/json'}
+                    })
+                        .then((response) => response.json())
+                        .then((data) => {
+                            this.coins = data;
+                            this.from_coin = data[0].symbol;
+                            this.to_coin = data[0].symbol;
+                            console.log('Success:', data);
+                        })
+                        .catch((error) => {
+                            console.error('Error:', error);
+                        });
+                },
+                get_deposit() {
+
+                    const data = {
+                        from_coin: this.from_coin, to_coin: this.to_coin,
+                        destination: this.destination, dest_memo: this.dest_memo
+                    };
+
+                    fetch('/api/convert/', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(data),
+                    })
+                        .then((response) => response.json())
+                        .then((data) => {
+                            this.error = null;
+                            this.deposit_account = null;
+                            this.deposit_address = null;
+                            this.deposit_memo = null;
+                            if ('error' in data) {
+                                this.error = data.message;
+                                return;
+                            }
+                            if ('address' in data) {
+                                this.deposit_address = data.address;
+                            }
+                            if ('account' in data) {
+                                this.deposit_account = data.account;
+                            }
+                            if ('memo' in data) {
+                                this.deposit_memo = data.memo;
+                            }
+                            console.log('Success:', data);
+                        })
+                        .catch((error) => {
+
+                            console.error('Error:', error);
+                        });
+                }
+            }
+        });
+        app.load_coins();
+    </script>
+{% endblock %}
