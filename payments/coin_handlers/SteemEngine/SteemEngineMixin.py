@@ -103,7 +103,7 @@ class SteemEngineMixin(SettingsMixin):
         :return beem.steem.Steem: An instance of :class:`beem.steem.Steem` for querying
         """
         if symbol not in self._eng_rpcs:
-            _settings = self.settings[symbol]['json']
+            _settings = self.all_coins[symbol].settings['json']
             log.info('Getting SteemEngine instance for coin %s - settings: %s', symbol, _settings)
 
             self._eng_rpcs[symbol] = mk_seng_rpc(rpc_settings=_settings)
