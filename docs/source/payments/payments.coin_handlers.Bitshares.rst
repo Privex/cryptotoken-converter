@@ -1,12 +1,12 @@
-.. _SteemEngine Handler:
+.. _Bitshares Handler:
 
-SteemEngine Coin Handler
+Bitshares Coin Handler
 ===========================================
 
 Module contents
 ---------------
 
-.. automodule:: payments.coin_handlers.SteemEngine
+.. automodule:: payments.coin_handlers.Bitshares
     :members:
     :undoc-members:
     :show-inheritance:
@@ -14,29 +14,27 @@ Module contents
 Submodules
 ----------
 
-SteemEngineLoader module
+BitsharesLoader module
 ------------------------------------------------------------
 
-.. automodule:: payments.coin_handlers.SteemEngine.SteemEngineLoader
+.. automodule:: payments.coin_handlers.Bitshares.BitsharesLoader
     :members:
     :undoc-members:
     :show-inheritance:
 
-SteemEngineManager module
+BitsharesManager module
 -------------------------------------------------------------
 
-.. automodule:: payments.coin_handlers.SteemEngine.SteemEngineManager
+.. automodule:: payments.coin_handlers.Bitshares.BitsharesManager
     :members:
     :undoc-members:
     :show-inheritance:
 
-SteemEngineMixin module
+BitsharesMixin module
 -------------------------------------------------------------
 
-.. automodule:: payments.coin_handlers.SteemEngine.SteemEngineMixin
+.. automodule:: payments.coin_handlers.Bitshares.BitsharesMixin
     :members:
     :undoc-members:
     :show-inheritance:
-
-
 

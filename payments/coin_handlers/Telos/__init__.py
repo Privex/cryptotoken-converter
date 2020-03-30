@@ -6,21 +6,47 @@ functionality for both receiving and sending tokens on the **Telos** network.
 
 It will automatically handle any :class:`payments.models.Coin` which has it's type set to ``telos``
 
-To use this handler, you must first create the base coin with symbol ``Telos``:
+To use this handler, you must first create the base coin with symbol ``Telos``::
 
-    Coin Name:  Telos
-    Symbol:     Telos
+    Coin Name:  TLOS
+    Symbol:     TLOS
     Our Account: (username of account used for sending/receiving native Telos token)
     Custom JSON: {"contract": "eosio.token"}
 
-To change the RPC node from the admin panel, simply set the host/port/username/password on the Telos Coin:
+To change the RPC node from the admin panel, simply set the host/port/username/password on the Telos Coin::
 
-    # Below are the defaults used if you don't configure the Telos coin:
+    # Below are the defaults used if you don't configure the Telos coin::
     Host: telos.caleos.io
     Port: 443
     User: (leave blank)
     Pass: (leave blank)
     Custom JSON: {"ssl": True}
+
+
+
+**Coin Settings (Custom JSON settings)**
+    
+    .. Tip::  You can override the defaults for all Telos coins by setting the ``settings_json`` for a coin with the symbol ``TLOS``.
+              
+              All :class:`.Coin`'s handled by the Telos handler will inherit the ``TLOS`` coin's custom JSON settings, which can be
+              overrided via the individual coin's ``settings_json``.
+    
+    You can set the following JSON keys inside of a :class:`.Coin`'s "settings_json" field to adjust settings such as the
+    "contract account" for the token, whether or not to use SSL with the RPC node, as well as the precision (DP) of the coin, if
+    it's different from the default of ``4`` decimal places.
+
+    =================  ==================================================================================================
+    Coin Key           Description
+    =================  ==================================================================================================
+    endpoint           (str) The base URI to query against, e.g. ``/telos_rpc/``
+    ssl                (bool) Whether or not to use SSL (https). Boolean ``true`` or ``false``
+    contract           (str) The contract account for this token, e.g. ``eosio.token`` or ``steemenginex``
+    precision          (int) The precision (decimal places) of this coin (defaults to ``4``)
+    
+    load_method        (str) Either ``actions`` to use v1/history, or ``pvx`` to use Privex EOS History
+    history_url        (str) (if load_method is pvx) Privex history URL, e.g. ``https://eos-history.privex.io``
+    =================  ==================================================================================================
+
 
 **Copyright**::
 

@@ -30,5 +30,11 @@ SteemManager module
     :undoc-members:
     :show-inheritance:
 
+SteemMixin module
+-------------------------------------------------------------
 
+.. automodule:: payments.coin_handlers.Steem.SteemMixin
+    :members:
+    :undoc-members:
+    :show-inheritance:
 

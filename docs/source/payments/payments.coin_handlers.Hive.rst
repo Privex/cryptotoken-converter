@@ -1,12 +1,12 @@
-.. _SteemEngine Handler:
+.. _Hive Handler:
 
-SteemEngine Coin Handler
+Hive Coin Handler
 ===========================================
 
 Module contents
 ---------------
 
-.. automodule:: payments.coin_handlers.SteemEngine
+.. automodule:: payments.coin_handlers.Hive
     :members:
     :undoc-members:
     :show-inheritance:
@@ -14,29 +14,27 @@ Module contents
 Submodules
 ----------
 
-SteemEngineLoader module
+HiveLoader module
 ------------------------------------------------------------
 
-.. automodule:: payments.coin_handlers.SteemEngine.SteemEngineLoader
+.. automodule:: payments.coin_handlers.Hive.HiveLoader
     :members:
     :undoc-members:
     :show-inheritance:
 
-SteemEngineManager module
+HiveManager module
 -------------------------------------------------------------
 
-.. automodule:: payments.coin_handlers.SteemEngine.SteemEngineManager
+.. automodule:: payments.coin_handlers.Hive.HiveManager
     :members:
     :undoc-members:
     :show-inheritance:
 
-SteemEngineMixin module
+HiveMixin module
 -------------------------------------------------------------
 
-.. automodule:: payments.coin_handlers.SteemEngine.SteemEngineMixin
+.. automodule:: payments.coin_handlers.Hive.HiveMixin
     :members:
     :undoc-members:
     :show-inheritance:
-
-
 

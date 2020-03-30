@@ -58,7 +58,7 @@ import os
 import sys
 
 import dotenv
-from getenv import env
+from os import getenv as env
 from steemengine.helpers import random_str
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)

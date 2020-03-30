@@ -68,6 +68,8 @@ class SteemEngineManager(BaseManager, SteemEngineMixin):
     """
 
     def __init__(self, symbol: str):
+        self._eng_rpc = None
+        self._eng_rpcs = {}
         super(SteemEngineManager, self).__init__(symbol)
 
     def health(self) -> Tuple[str, tuple, tuple]:
@@ -87,7 +89,7 @@ class SteemEngineManager(BaseManager, SteemEngineMixin):
 
         status = 'Okay'
         try:
-            rpc = self.eng_rpc
+            rpc = self.get_rpc(self.symbol)
             api_node = rpc.rpc.url
             our_account = self.coin.our_account
             if not rpc.account_exists(our_account):
@@ -145,9 +147,10 @@ class SteemEngineManager(BaseManager, SteemEngineMixin):
         address = address.lower()
         if memo is not None:
             memo = str(memo).strip()
+        rpc = self.get_rpc(self.symbol)
         if empty(memo):
-            return self.eng_rpc.get_token_balance(user=address, symbol=self.symbol)
-        txs = self.eng_rpc.list_transactions(user=address, symbol=self.symbol, limit=1000)
+            return rpc.get_token_balance(user=address, symbol=self.symbol)
+        txs = rpc.list_transactions(user=address, symbol=self.symbol, limit=1000)
         bal = Decimal(0)
         for t in txs:
             if t['to'] == address and t['symbol'] == self.symbol:

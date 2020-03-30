@@ -6,6 +6,52 @@ functionality for both receiving and sending tokens on the **SteemEngine** netwo
 
 It will automatically handle any :class:`payments.models.Coin` which has it's type set to ``steemengine``
 
+**Global Settings**
+
+The following global settings are used by this handler (set within :mod:`steemengine.settings.custom`). All of the below settings
+can be specified with the same key inside of your ``.env`` file to override the defaults.
+
+    =========================  ==================================================================================
+    Setting                    Description
+    =========================  ==================================================================================
+    ``SENG_RPC_NODE``           The hostname for the contract API server, e.g. ``api.steem-engine.com``
+    ``SENG_RPC_URL``            The URL for the contract API e.g. ``/rpc/contracts``
+    ``SENG_HISTORY_NODE``       The hostname for the history API server, e.g. ``api.steem-engine.com``
+    ``SENG_HISTORY_URL``        The URL for the history API e.g. ``accounts/history``
+    ``SENG_NETWORK_ACCOUNT``    The "network account" for SteemEngine, e.g. ``ssc-mainnet1``
+    =========================  ==================================================================================
+
+**Coin object settings**:
+
+    You can set the following JSON keys inside of a :class:`.Coin`'s "settings_json" field if you want to use
+    an alternative SteemEngine RPC node, or history node just for that coin.
+
+    =================  ==================================================================================================
+    Coin Key           Description
+    =================  ==================================================================================================
+    rpc_node           The hostname for the contract API server, e.g. ``api.steem-engine.com``
+    rpc_url            The URL for the contract API e.g. ``/rpc/contracts``
+    history_node       The hostname for the history API server, e.g. ``api.steem-engine.com``
+    history_url        The URL for the history API e.g. ``accounts/history``
+    network_account    The "network account" for SteemEngine, e.g. ``ssc-mainnet1``
+    =================  ==================================================================================================
+    
+    For example, placing the following JSON inside of ``settings_json`` for a certain coin, would result in the contract API
+    ``https://api.hive-engine.com/contracts`` and history API ``https://accounts.hive-engine.com/accountHistory`` being used only
+    for this particular coin, while coins without any ``settings_json`` overrides would continue using the global ``SENG_RPC_NODE`` etc.
+    
+    .. code-block:: json
+        
+        {
+            "rpc_node": "api.hive-engine.com",
+            "rpc_url": "/contracts",
+            "history_node": "accounts.hive-engine.com",
+            "history_url": "accountHistory"
+        }
+    
+       
+
+
 **Copyright**::
 
     +===================================================+

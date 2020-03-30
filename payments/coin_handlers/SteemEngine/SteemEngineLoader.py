@@ -60,6 +60,8 @@ class SteemEngineLoader(BaseLoader, SteemEngineMixin):
     """
 
     def __init__(self, symbols):
+        self._eng_rpc = None
+        self._eng_rpcs = {}
         super(SteemEngineLoader, self).__init__(symbols=symbols)
         self.tx_count = 1000
         self.loaded = False
@@ -101,7 +103,7 @@ class SteemEngineLoader(BaseLoader, SteemEngineMixin):
                 if tx['from'].lower() in ['tokens', 'market']: continue  # Ignore token issues and market transactions
                 if tx['to'].lower() != account.lower(): continue  # If we aren't the receiver, we don't need it.
                 # Cache the token for 5 mins, so we aren't spamming the token API
-                token = cache.get_or_set('stmeng:'+symbol, lambda: self.eng_rpc.get_token(symbol), 300)
+                token = cache.get_or_set('stmeng:'+symbol, lambda: self.get_rpc(symbol).get_token(symbol), 300)
 
                 q = tx['quantity']
                 if type(q) == float:
@@ -119,7 +121,7 @@ class SteemEngineLoader(BaseLoader, SteemEngineMixin):
     def load_batch(self, account, symbol, limit=100, offset=0, retry=0):
         """Load SteemEngine transactions for account/symbol into self.transactions with automatic retry on error"""
         try:
-            self.transactions = self.eng_rpc.list_transactions(account, symbol, limit=limit, offset=offset)
+            self.transactions = self.get_rpc(symbol).list_transactions(account, symbol, limit=limit, offset=offset)
         except:
             log.exception('Something went wrong while loading transactions for symbol %s account %s', account, symbol)
             if retry >= 3:

@@ -1,12 +1,12 @@
-.. _SteemEngine Handler:
+.. _Telos Handler:
 
-SteemEngine Coin Handler
+Telos Coin Handler
 ===========================================
 
 Module contents
 ---------------
 
-.. automodule:: payments.coin_handlers.SteemEngine
+.. automodule:: payments.coin_handlers.Telos
     :members:
     :undoc-members:
     :show-inheritance:
@@ -14,29 +14,27 @@ Module contents
 Submodules
 ----------
 
-SteemEngineLoader module
+TelosLoader module
 ------------------------------------------------------------
 
-.. automodule:: payments.coin_handlers.SteemEngine.SteemEngineLoader
+.. automodule:: payments.coin_handlers.Telos.TelosLoader
     :members:
     :undoc-members:
     :show-inheritance:
 
-SteemEngineManager module
+TelosManager module
 -------------------------------------------------------------
 
-.. automodule:: payments.coin_handlers.SteemEngine.SteemEngineManager
+.. automodule:: payments.coin_handlers.Telos.TelosManager
     :members:
     :undoc-members:
     :show-inheritance:
 
-SteemEngineMixin module
+TelosMixin module
 -------------------------------------------------------------
 
-.. automodule:: payments.coin_handlers.SteemEngine.SteemEngineMixin
+.. automodule:: payments.coin_handlers.Telos.TelosMixin
     :members:
     :undoc-members:
     :show-inheritance:
-
-
 

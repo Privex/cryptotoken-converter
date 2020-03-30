@@ -1,12 +1,12 @@
-.. _SteemEngine Handler:
+.. _EOS Handler:
 
-SteemEngine Coin Handler
+EOS Coin Handler
 ===========================================
 
 Module contents
 ---------------
 
-.. automodule:: payments.coin_handlers.SteemEngine
+.. automodule:: payments.coin_handlers.EOS
     :members:
     :undoc-members:
     :show-inheritance:
@@ -14,29 +14,27 @@ Module contents
 Submodules
 ----------
 
-SteemEngineLoader module
+EOSLoader module
 ------------------------------------------------------------
 
-.. automodule:: payments.coin_handlers.SteemEngine.SteemEngineLoader
+.. automodule:: payments.coin_handlers.EOS.EOSLoader
     :members:
     :undoc-members:
     :show-inheritance:
 
-SteemEngineManager module
+EOSManager module
 -------------------------------------------------------------
 
-.. automodule:: payments.coin_handlers.SteemEngine.SteemEngineManager
+.. automodule:: payments.coin_handlers.EOS.EOSManager
     :members:
     :undoc-members:
     :show-inheritance:
 
-SteemEngineMixin module
+EOSMixin module
 -------------------------------------------------------------
 
-.. automodule:: payments.coin_handlers.SteemEngine.SteemEngineMixin
+.. automodule:: payments.coin_handlers.EOS.EOSMixin
     :members:
     :undoc-members:
     :show-inheritance:
-
-
 

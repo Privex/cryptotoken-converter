@@ -28,6 +28,14 @@ BatchLoader
     :undoc-members:
     :show-inheritance:
 
+SettingsMixin
+-----------------------------------------------
+
+.. automodule:: payments.coin_handlers.base.SettingsMixin
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
 Base Decorators
 ----------------------------------------------
 
