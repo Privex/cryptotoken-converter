@@ -62,6 +62,17 @@ hive_ins.set_password_storage('environment')  # Get Beem wallet pass from env va
 set_shared_hive_instance(steem_ins)
 
 #########
+# SteemEngine Handler Network related settings
+####
+SENG_NETWORK_ACCOUNT = env('SENG_NETWORK_ACCOUNT', 'ssc-mainnet1')
+
+SENG_RPC_NODE = env('SENG_RPC_NODE', 'api.steem-engine.com')
+SENG_RPC_URL = env('SENG_RPC_URL', '/rpc/contracts')
+
+SENG_HISTORY_NODE = env('SENG_HISTORY_NODE', 'api.steem-engine.com')
+SENG_HISTORY_URL = env('SENG_HISTORY_URL', 'accounts/history')
+
+#########
 # Bitshares Network related settings
 ####
 

@@ -22,18 +22,16 @@ from time import sleep
 from typing import Generator, Iterable, List
 
 from dateutil.parser import parse
-from django.conf import settings
 from django.core.cache import cache
-
+from payments.coin_handlers.SteemEngine.SteemEngineMixin import SteemEngineMixin
 from payments.coin_handlers.base.BaseLoader import BaseLoader
-from privex.steemengine import SteemEngineToken
 from payments.models import Coin
 from steemengine.helpers import empty
 
 log = logging.getLogger(__name__)
 
 
-class SteemEngineLoader(BaseLoader):
+class SteemEngineLoader(BaseLoader, SteemEngineMixin):
     """
     This class handles loading transactions for the **SteemEngine** network, and can support almost any token
     on SteemEngine.
@@ -62,8 +60,7 @@ class SteemEngineLoader(BaseLoader):
     """
 
     def __init__(self, symbols):
-        super().__init__(symbols=symbols)
-        self.eng_rpc = SteemEngineToken()
+        super(SteemEngineLoader, self).__init__(symbols=symbols)
         self.tx_count = 1000
         self.loaded = False
 

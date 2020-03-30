@@ -20,6 +20,8 @@ import privex.steemengine.exceptions as SENG
 from typing import List, Tuple
 from beem.exceptions import MissingKeyError
 from decimal import Decimal, getcontext, ROUND_DOWN
+
+from payments.coin_handlers.SteemEngine.SteemEngineMixin import SteemEngineMixin
 from payments.coin_handlers.base import exceptions, BaseManager
 from privex.steemengine import SteemEngineToken
 from steemengine.helpers import empty
@@ -30,7 +32,7 @@ getcontext().rounding = ROUND_DOWN
 log = logging.getLogger(__name__)
 
 
-class SteemEngineManager(BaseManager):
+class SteemEngineManager(BaseManager, SteemEngineMixin):
     """
     This class handles various operations for the **SteemEngine** network, and supports almost any token
     on SteemEngine.
@@ -66,8 +68,7 @@ class SteemEngineManager(BaseManager):
     """
 
     def __init__(self, symbol: str):
-        super().__init__(symbol)
-        self.eng_rpc = SteemEngineToken()
+        super(SteemEngineManager, self).__init__(symbol)
 
     def health(self) -> Tuple[str, tuple, tuple]:
         """
