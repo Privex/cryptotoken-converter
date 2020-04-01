@@ -107,6 +107,7 @@ COIN_HANDLERS_BASE = env('COIN_HANDLERS_BASE', 'payments.coin_handlers')
 
 COIN_HANDLERS = env_csv('COIN_HANDLERS', [
     'SteemEngine',
+    'HiveEngine',
     'Bitcoin',
     'Steem',
     'Hive',
