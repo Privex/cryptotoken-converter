@@ -1,13 +1,11 @@
 from typing import Optional, Dict
 
-from bhive.asset import Asset
-from bhive.blockchain import Blockchain
+from beem.asset import Asset
+from beem.blockchain import Blockchain
 from privex.helpers import empty
 
-from payments.coin_handlers.Steem.SteemMixin import SteemMixin
 from payments.coin_handlers.base import SettingsMixin
-from bhive.hive import Hive
-from bhive.instance import shared_hive_instance
+from beem.steem import Steem
 from django.conf import settings
 import logging
 
@@ -16,7 +14,7 @@ log = logging.getLogger(__name__)
 
 class HiveMixin(SettingsMixin):
     """
-    SteemMixin - Shared code between SteemManager and SteemLoader
+    HiveMixin - Shared code between SteemManager and SteemLoader
 
     Designed for the Steem Network with SBD and STEEM support. May or may not work with other Graphene coins.
 
@@ -44,13 +42,13 @@ class HiveMixin(SettingsMixin):
         self._rpc = None
         
         # List of Steem instances mapped by symbol
-        self._rpcs = {}  # type: Dict[str, Hive]
+        self._rpcs = {}  # type: Dict[str, Steem]
         
         # Internal storage variables for the properties ``asset`` and ``precisions``
         self._asset = self._precision = None
     
     @property
-    def rpc(self) -> Hive:
+    def rpc(self) -> Steem:
         if not self._rpc:
             # Use the symbol of the first coin for our settings.
             symbol = list(self.all_coins.keys())[0]
@@ -58,43 +56,43 @@ class HiveMixin(SettingsMixin):
             rpcs = _settings.get('rpcs', settings.HIVE_RPC_NODES)
             
             # If you've specified custom RPC nodes in the custom JSON, make a new instance with those
-            # Otherwise, use the global shared_hive_instance.
+            # Otherwise, use the global shared_steem_instance.
             rpc_conf = dict(num_retries=5, num_retries_call=3, timeout=20, node=rpcs)
-            log.info('Getting BHive instance for coin %s - settings: %s', symbol, rpc_conf)
+            log.info('Getting BSteem instance for coin %s - settings: %s', symbol, rpc_conf)
             
-            self._rpc = Hive(node=rpcs, **rpc_conf) if empty(rpcs, itr=True) else Hive(**rpc_conf)  # type: Hive
+            self._rpc = Steem(node=rpcs, **rpc_conf) if empty(rpcs, itr=True) else Steem(**rpc_conf)  # type: Steem
             self._rpc.set_password_storage(_settings.get('pass_store', 'environment'))
             self._rpcs[symbol] = self._rpc
         return self._rpc
     
-    def get_rpc(self, symbol: str) -> Hive:
+    def get_rpc(self, symbol: str) -> Steem:
         """
-        Returns a Hive instance for querying data and sending TXs. By default, uses the BHive shared_hive_instance.
+        Returns a Steem instance for querying data and sending TXs. By default, uses the BSteem shared_steem_instance.
 
         If a custom RPC list is specified in the Coin "custom json" settings, a new instance will be returned with the
         RPCs specified in the json.
 
-        :param symbol: Coin symbol to get BHive RPC instance for
-        :return beem.steem.Hive: An instance of :class:`beem.steem.Hive` for querying
+        :param symbol: Coin symbol to get BSteem RPC instance for
+        :return beem.steem.Steem: An instance of :class:`beem.steem.Steem` for querying
         """
         if symbol not in self._rpcs:
             _settings = self.settings[symbol]['json']
             rpcs = _settings.get('rpcs', settings.HIVE_RPC_NODES)
             rpc_conf = dict(num_retries=5, num_retries_call=3, timeout=20, node=rpcs)
-            log.info('Getting BHive instance for coin %s - settings: %s', symbol, rpc_conf)
-            self._rpcs[symbol] = self.rpc if empty(rpcs, itr=True) else Hive(**rpc_conf)
+            log.info('Getting BSteem instance for coin %s - settings: %s', symbol, rpc_conf)
+            self._rpcs[symbol] = self.rpc if empty(rpcs, itr=True) else Steem(**rpc_conf)
             self._rpcs[symbol].set_password_storage(_settings.get('pass_store', 'environment'))
         return self._rpcs[symbol]
     
     @property
     def asset(self, symbol=None) -> Optional[Asset]:
-        """Easy reference to the BHive Asset object for our current symbol"""
+        """Easy reference to the BSteem Asset object for our current symbol"""
         if not self._asset:
             if empty(symbol):
                 if not hasattr(self, 'symbol'):
                     return None
                 symbol = self.symbol
-            self._asset = Asset(symbol, hive_instance=self.rpc)
+            self._asset = Asset(symbol, steem_instance=self.rpc)
         return self._asset
     
     @property
@@ -118,7 +116,7 @@ class HiveMixin(SettingsMixin):
         :return None:             If the transaction wasn't found, None will be returned.
         """
         # Code taken/based from @holgern/beem blockchain.py
-        chain = Blockchain(hive_instance=self.rpc, mode='head')
+        chain = Blockchain(steem_instance=self.rpc, mode='head')
         current_num = chain.get_current_block_num()
         for block in chain.blocks(start=current_num - last_blocks, stop=current_num + 5):
             for tx in block.transactions:

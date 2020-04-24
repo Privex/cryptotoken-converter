@@ -4,12 +4,12 @@ from decimal import Decimal, getcontext, ROUND_DOWN
 from typing import Dict, List, Iterable, Generator, Union
 
 import pytz
-from bhive.asset import Asset
+from beem.asset import Asset
 from dateutil.parser import parse
 from django.utils import timezone
 
 from payments.coin_handlers import BaseLoader
-from bhive.account import Account
+from beem.account import Account
 
 from payments.coin_handlers.Hive.HiveMixin import HiveMixin
 from steemengine.helpers import empty
@@ -37,7 +37,7 @@ class HiveLoader(BaseLoader, HiveMixin):
             self.load()
         for symbol, c in self.coins.items():
             acc_name = c.our_account
-            acc = Account(acc_name, hive_instance=self.get_rpc(c.symbol_id))
+            acc = Account(acc_name, steem_instance=self.get_rpc(c.symbol_id))
             # get_account_history returns a generator with automatic batching, so we don't have to worry about batches.
             txs = acc.get_account_history(-1, self.tx_count, only_ops=['transfer'])
             yield from self.clean_txs(symbol=c.symbol_id, transactions=txs, account=acc_name)
@@ -108,9 +108,9 @@ class HiveLoader(BaseLoader, HiveMixin):
     
         if type(_am) is str:  # Extract and validate asset 'ABC' from '12.345 ABC'
             amt, _symbol = _am.split()
-            _asset = Asset(symbol, hive_instance=self.get_rpc(symbol))
+            _asset = Asset(symbol, steem_instance=self.get_rpc(symbol))
         else:  # Conv asset ID (e.g. @@000000021) to symbol, i.e. "STEEM"
-            _asset = Asset(_am['nai'], hive_instance=self.get_rpc(symbol))
+            _asset = Asset(_am['nai'], steem_instance=self.get_rpc(symbol))
             # Convert integer amount/precision to Decimal's, preventing floating point issues
             amt_int = Decimal(_am['amount'])
             amt_prec = Decimal(_am['precision'])

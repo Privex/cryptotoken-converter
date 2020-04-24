@@ -6,8 +6,8 @@ from payments.coin_handlers import BaseManager
 from payments.coin_handlers.Hive import HiveLoader
 from payments.coin_handlers.Hive.HiveMixin import HiveMixin
 from payments.coin_handlers.Steem import SteemManager
-from bhive.account import Account
-from bhive.exceptions import AccountDoesNotExistsException, MissingKeyError
+from beem.account import Account
+from beem.exceptions import AccountDoesNotExistsException, MissingKeyError
 
 from payments.coin_handlers.base import exceptions
 from steemengine.helpers import empty
@@ -92,7 +92,7 @@ class HiveManager(BaseManager, HiveMixin):
         :return bool: True if account exists, False if it doesn't
         """
         try:
-            Account(address, hive_instance=self.rpc)
+            Account(address, steem_instance=self.rpc)
             return True
         except AccountDoesNotExistsException:
             return False
@@ -119,7 +119,7 @@ class HiveManager(BaseManager, HiveMixin):
         if not address:
             address = self.coin.our_account
     
-        acc = Account(address, hive_instance=self.rpc)
+        acc = Account(address, steem_instance=self.rpc)
     
         if not empty(memo):
             hist = acc.get_account_history(-1, 10000, only_ops=['transfer'])
@@ -191,7 +191,7 @@ class HiveManager(BaseManager, HiveMixin):
                 log.warning('Amount %s was passed, but is lower than precision for %s', amount, sym)
                 raise ArithmeticError('Amount {} is lower than token {}s precision of {} DP'.format(amount, sym, prec))
         
-            acc = Account(from_address, hive_instance=self.rpc)
+            acc = Account(from_address, steem_instance=self.rpc)
         
             if not self.address_valid(address): raise exceptions.AccountNotFound('Destination account does not exist')
             if not self.address_valid(from_address): raise exceptions.AccountNotFound('From account does not exist')

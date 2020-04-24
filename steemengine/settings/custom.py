@@ -38,8 +38,8 @@ Copyright::
 from decimal import Decimal
 from beem.steem import Steem
 from beem.instance import set_shared_steem_instance
-from bhive.hive import Hive
-from bhive.instance import set_shared_hive_instance
+# from bhive.hive import Hive
+# from bhive.instance import set_shared_hive_instance
 from getenv import env
 
 #########
@@ -50,16 +50,16 @@ from privex.helpers import env_csv
 # Supply a list of one or more comma-separated Steem RPC nodes. If not set, will use the default beem nodes.
 STEEM_RPC_NODES = env_csv('STEEM_RPC_NODES', None)
 # Supply a list of one or more comma-separated Steem RPC nodes. If not set, will use the default beem nodes.
-HIVE_RPC_NODES = env_csv('HIVE_RPC_NODES', ['https://anyx.io'])
+HIVE_RPC_NODES = env_csv('HIVE_RPC_NODES', ['https://anyx.io', 'https://hived.privex.io', 'https://hived.hive-engine.com'])
 # Set the shared Beem RPC instance to use the specified nodes
 steem_ins = Steem(node=STEEM_RPC_NODES, num_retries=5, num_retries_call=3, timeout=20)
 steem_ins.set_password_storage('environment')  # Get Beem wallet pass from env var ``UNLOCK``
 set_shared_steem_instance(steem_ins)
 
 # Set the shared Beem RPC instance to use the specified nodes
-hive_ins = Hive(node=HIVE_RPC_NODES, num_retries=5, num_retries_call=3, timeout=20)
-hive_ins.set_password_storage('environment')  # Get Beem wallet pass from env var ``UNLOCK``
-set_shared_hive_instance(steem_ins)
+# hive_ins = Hive(node=HIVE_RPC_NODES, num_retries=5, num_retries_call=3, timeout=20)
+# hive_ins.set_password_storage('environment')  # Get Beem wallet pass from env var ``UNLOCK``
+# set_shared_hive_instance(hive_ins)
 
 #########
 # SteemEngine Handler Network related settings
