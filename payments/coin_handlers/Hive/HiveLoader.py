@@ -47,9 +47,9 @@ class HiveLoader(BaseLoader, HiveMixin):
         """To ensure we always get fresh settings from the DB after a reload"""
         return dict(((sym, c.settings) for sym, c in self.coins.items()))
 
-    def load(self, tx_count=10000):
+    def load(self, tx_count=1000):
         # Unlike other coins, it's important to load a lot of TXs, because many won't actually be transfers
-        # Thus the default TX count for Steem is 10,000
+        # Thus the default TX count for Hive is 1000
         self.tx_count = tx_count
         for symbol, coin in self.coins.items():
             if not empty(coin.our_account):

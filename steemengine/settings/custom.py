@@ -66,10 +66,10 @@ set_shared_steem_instance(steem_ins)
 ####
 SENG_NETWORK_ACCOUNT = env('SENG_NETWORK_ACCOUNT', 'ssc-mainnet1')
 
-SENG_RPC_NODE = env('SENG_RPC_NODE', 'api.steem-engine.com')
+SENG_RPC_NODE = env('SENG_RPC_NODE', 'api.steem-engine.net')
 SENG_RPC_URL = env('SENG_RPC_URL', '/rpc/contracts')
 
-SENG_HISTORY_NODE = env('SENG_HISTORY_NODE', 'api.steem-engine.com')
+SENG_HISTORY_NODE = env('SENG_HISTORY_NODE', 'api.steem-engine.net')
 SENG_HISTORY_URL = env('SENG_HISTORY_URL', 'accounts/history')
 
 # Change to 'hive' to switch privex-steemengine to use beem with Hive RPCs instead of Steem RPCs
