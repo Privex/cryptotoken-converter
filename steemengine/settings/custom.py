@@ -76,6 +76,12 @@ SENG_HISTORY_URL = env('SENG_HISTORY_URL', 'accounts/history')
 SENG_NETWORK = env('SENG_NETWORK', 'steem')
 
 #########
+# Hive Engine Network related settings
+####
+HE_RPC_NODES = env('HE_RPC_NODES', 'https://api.hive-engine.com/rpc').split(',')
+HE_API_VERIFIES_NEEDED = int(env('HE_API_VERIFIES_NEEDED', 0))
+
+#########
 # Bitshares Network related settings
 ####
 
