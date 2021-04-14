@@ -19,24 +19,54 @@ def mk_heng_rpc() -> SteemEngineToken:
     """
     global curr_node_index
 
-    rpc_node = settings.HE_RPC_NODES[curr_node_index]
-    curr_node_index += 1
-    if curr_node_index >= len(settings.HE_RPC_NODES):
-        curr_node_index = 0
-    
-    rpc_url = '/contracts'
-    history_node = 'accounts.hive-engine.com'
-    history_url = 'accountHistory'
-    network_account = 'ssc-mainnet-hive'
-    network = 'hive'
-    
-    return SteemEngineToken(
-        network_account=network_account,
-        network=network,
-        history_conf=dict(hostname=history_node, url=history_url),
-        hostname=rpc_node,
-        url=rpc_url
-    )
+    num_retries = 0
+    while True:
+        rpc_node = settings.HE_RPC_NODES[curr_node_index]
+        curr_node_index += 1
+        if curr_node_index >= len(settings.HE_RPC_NODES):
+            curr_node_index = 0
+
+        # strip off the http or https prefix
+        use_ssl = False
+        port_num = ''
+        if rpc_node[:8] == 'https://':
+            use_ssl = True
+            port_num = 443
+            rpc_node = rpc_node[8:]
+        elif rpc_node[:7] == 'http://':
+            rpc_node = rpc_node[7:]
+            node_parts = rpc_node.split(':')
+            rpc_node = node_parts[0]
+            if len(node_parts) > 1:
+                port_num = int(node_parts[1])
+
+        rpc_url = '/contracts'
+        if use_ssl:
+            rpc_url = '/rpc/contracts'
+        history_node = 'accounts.hive-engine.com'
+        history_url = 'accountHistory'
+        network_account = 'ssc-mainnet-hive'
+        network = 'hive'
+
+        try:
+            token = SteemEngineToken(
+                network_account=network_account,
+                network=network,
+                history_conf=dict(hostname=history_node, url=history_url),
+                hostname=rpc_node,
+                url=rpc_url,
+                port=port_num,
+                ssl=use_ssl
+            )
+            return token
+        except Exception as e:
+            num_retries += 1
+            log.error('unable to connect to %s (attempt %s)', rpc_node, str(num_retries))
+            if num_retries >= 5:
+                log.error('giving up')
+                raise
+            else:
+                log.error('will try again')
 
 
 class HiveEngineMixin(SteemEngineMixin):

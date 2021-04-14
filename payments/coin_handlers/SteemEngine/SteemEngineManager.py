@@ -88,27 +88,34 @@ class SteemEngineManager(BaseManager, SteemEngineMixin):
         api_node = token_name = issuer = precision = our_account = balance = ''
 
         status = 'Okay'
-        try:
-            rpc = self.get_rpc(self.symbol)
-            api_node = rpc.rpc.url
-            our_account = self.coin.our_account
-            if not rpc.account_exists(our_account):
-                status = 'Account {} not found'.format(our_account)
-            tk = rpc.get_token(self.symbol)
-            if empty(tk, itr=True):
-                raise exceptions.TokenNotFound('Token data was empty')
-            tk = dict(tk)
-            issuer = tk.get('issuer', 'ERROR GETTING ISSUER')
-            token_name = tk.get('name', 'ERROR GETTING NAME')
-            precision = str(tk.get('precision', 'ERROR GETTING PRECISION'))
-            balance = self.balance(our_account)
-            balance = ('{0:,.' + str(tk['precision']) + 'f}').format(balance)
-        except exceptions.TokenNotFound:
-            status = 'ERROR'
-            token_name = '<b style="color: red">Token does not exist...</b>'
-        except:
-            status = 'ERROR'
-            log.exception('Exception during %s.health for symbol %s', class_name, self.symbol)
+        num_retries = 0
+        while True:
+            try:
+                rpc = self.get_rpc(self.symbol)
+                api_node = rpc.rpc.url
+                our_account = self.coin.our_account
+                if not rpc.account_exists(our_account):
+                    status = 'Account {} not found'.format(our_account)
+                tk = rpc.get_token(self.symbol)
+                if empty(tk, itr=True):
+                    raise exceptions.TokenNotFound('Token data was empty')
+                tk = dict(tk)
+                issuer = tk.get('issuer', 'ERROR GETTING ISSUER')
+                token_name = tk.get('name', 'ERROR GETTING NAME')
+                precision = str(tk.get('precision', 'ERROR GETTING PRECISION'))
+                balance = self.balance(our_account)
+                balance = ('{0:,.' + str(tk['precision']) + 'f}').format(balance)
+                break
+            except exceptions.TokenNotFound:
+                status = 'ERROR'
+                token_name = '<b style="color: red">Token does not exist...</b>'
+                break
+            except:
+                num_retries += 1
+                if num_retries >= 5:
+                    status = 'ERROR'
+                    log.exception('Exception during %s.health for symbol %s', class_name, self.symbol)
+                    break
 
         if status == 'Okay':
             status = '<b style="color: green">{}</b>'.format(status)
