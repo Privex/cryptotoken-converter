@@ -154,17 +154,24 @@ class SteemEngineManager(BaseManager, SteemEngineMixin):
         address = address.lower()
         if memo is not None:
             memo = str(memo).strip()
-        rpc = self.get_rpc(self.symbol)
-        if empty(memo):
-            return rpc.get_token_balance(user=address, symbol=self.symbol)
-        txs = rpc.list_transactions(user=address, symbol=self.symbol, limit=1000)
-        bal = Decimal(0)
-        for t in txs:
-            if t['to'] == address and t['symbol'] == self.symbol:
-                m = t['memo'].strip()
-                if m == memo or (not memo_case and m == memo.lower()):
-                    bal += Decimal(t['quantity'])
-        return bal
+        num_retries = 0
+        while True:
+            try:
+                rpc = self.get_rpc(self.symbol)
+                if empty(memo):
+                    return rpc.get_token_balance(user=address, symbol=self.symbol)
+                txs = rpc.list_transactions(user=address, symbol=self.symbol, limit=1000)
+                bal = Decimal(0)
+                for t in txs:
+                    if t['to'] == address and t['symbol'] == self.symbol:
+                        m = t['memo'].strip()
+                        if m == memo or (not memo_case and m == memo.lower()):
+                            bal += Decimal(t['quantity'])
+                return bal
+            except:
+                num_retries += 1
+                if num_retries >= 5:
+                    raise
 
     def get_deposit(self) -> tuple:
         """
