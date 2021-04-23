@@ -4,6 +4,7 @@ from typing import Generator, List, Iterable
 
 import pytz
 import requests
+import json
 from dateutil.parser import parse
 from django.core.cache import cache
 from django.utils import timezone
@@ -110,6 +111,10 @@ class EOSLoader(BaseLoader, EOSMixin):
                         contract=self.get_contract(sym)
                     )
                     yield from self.pvx_clean_txs(c.our_account, sym, self.get_contract(sym), actions)
+                elif load_method == 'v2_actions':
+                    log.debug(f'Loading {chain} actions for token "{sym}" using v2 account history, received to "{c.our_account}"')
+                    actions = self.v2_get_actions(c.our_account, 100)
+                    yield from self.v2_clean_txs(c.our_account, sym, self.get_contract(sym), actions)
                 else:
                     log.debug(f'Loading {chain} actions for token "{sym}", received to "{c.our_account}"')
                     # actions = self.get_actions(c.our_account, self.tx_count)
@@ -119,7 +124,70 @@ class EOSLoader(BaseLoader, EOSMixin):
                 log.exception('Something went wrong while loading transactions for coin %s. Skipping for now.', c)
                 continue
 
-    
+    def v2_clean_txs(self, account, symbol, contract, transactions: Iterable[dict]) -> Generator[dict, None, None]:
+        """
+        Filters a given Iterable of dict's containing raw EOS "actions":
+
+         - Finds only incoming `transfer` transactions from accounts that are not us (`account`)
+         - Filters transactions by both `symbol` and verifies they're from the `contract` account
+         - Outputs valid incoming TXs in the standardised Deposit format.
+
+        :param str account:         The account which should be receiving `symbol`
+        :param str symbol:          The coin symbol to search for, e.g. "EOS"
+        :param str contract:        The EOS contract account to filter by, e.g. "eosio.token"
+        :param Iterable[dict] transactions:   An iterable list/generator of EOS actions as dict's
+        :return Generator cleaned_txs:  A generator yielding valid Deposit TXs as dict's
+        """
+        for tx in transactions:
+            try:
+                # Decompose various information from the complex EOS transaction format
+                #  - The `act` contains metadata about the transaction such as the contract account, tx type, and body
+                #  - The `data` of `act` contains the actual sender username, and the memo
+                txid, act = tx['trx_id'], tx['act']
+                contract_acc, tx_type, tx_data = act['account'], act['name'], act['data']
+                if tx_type != 'transfer':
+                    continue  # if the transaction isn't a transfer, we don't care.
+
+                # ignore transactions that are missing a 'from'
+                if 'from' not in tx_data:
+                    continue
+
+                # Some transfers might not contain a memo key at all, so fallback to '' if the key doesn't exist.
+                raw_memo, from_acc, to_acc = tx_data.get('memo', ''), tx_data['from'], tx_data['to']
+
+                # Some Telos users deposit from a wallet that has a non-standard memo format, so we check for that here.
+                memo = ''
+                try:
+                    json_memo = json.loads(raw_memo)
+                    if 'tag' in json_memo and 'memo' in json_memo and json_memo['tag'] == 'coolx':
+                        memo = json_memo['memo']
+                    else:
+                        memo = raw_memo
+                except Exception:
+                    memo = raw_memo
+
+                # In EOS, the act['account'] (contract_acc) account is the owner of the smart contract
+                # not the actual user who sent it. The "act.data.to" (to_acc) however, should be us.
+                if contract_acc != contract or to_acc != account:
+                    continue
+
+                if from_acc == account:
+                    continue  # skip our own transactions
+
+                amount, txcurrency = tuple(tx_data['quantity'].split(' '))
+                if txcurrency != symbol:
+                    continue  # skip foreign currency
+
+                ts = parse(tx['timestamp'])
+                ts = timezone.make_aware(ts, pytz.UTC)
+
+                yield dict(
+                    txid=txid, coin=self.coins[symbol].symbol, tx_timestamp=ts, from_account=from_acc,
+                    to_account=to_acc, memo=memo, amount=Decimal(amount)
+                )
+            except Exception:
+                log.exception('Error parsing transaction data. Skipping this TX. tx = %s', tx)
+                continue
 
     def clean_txs(self, account, symbol, contract, transactions: Iterable[dict]) -> Generator[dict, None, None]:
         """
@@ -287,6 +355,28 @@ class EOSLoader(BaseLoader, EOSMixin):
             c = self.eos
             data = c.get_actions(account, pos=-1, offset=-count)
             actions = data['actions']
+            cache.set(cache_key, actions, timeout=60)
+
+        return actions
+
+    @retry_on_err(3, 3)     # Auto-retry on exception up to 3 times, with 3 seconds delay between attempts
+    def v2_get_actions(self, account: str, count=100) -> List[dict]:
+        """
+        Loads EOS transactions for a given account, and caches them per account to avoid constant queries.
+        Uses v2 account history API
+
+        :param account:  The EOS account to load transactions for
+        :param count:    Amount of transactions to load
+        :return list transactions: A list of EOS transactions as dict's
+        """
+        cache_key = f'{self.chain}_v2_actions:{account}'
+        actions = cache.get(cache_key)
+
+        if empty(actions):
+            log.info('Loading %s v2 actions for %s from node %s', self.chain.upper(), account, self.url)
+            url = f'{self.url}/v2/history/get_actions?limit={count}&account={account}'
+            req = requests.get(url)
+            actions = req.json()['actions']
             cache.set(cache_key, actions, timeout=60)
 
         return actions
