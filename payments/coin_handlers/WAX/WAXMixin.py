@@ -15,8 +15,8 @@ class WAXMixin(EOSMixin):
     chain_coin = 'WAX'
     
     setting_defaults = dict(
-        host='chain.wax.io', username=None, password=None, endpoint='/', port=443, ssl=True, precision=4,
-        telos=False, load_method='actions', history_url='',
+        host='api.waxsweden.org', username=None, password=None, endpoint='/', port=443, ssl=True, precision=4,
+        telos=False, load_method='v2_actions', history_url='',
     )
     
     _wax = None  # type: Cleos
