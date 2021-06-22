@@ -121,6 +121,7 @@ COIN_HANDLERS = env_csv('COIN_HANDLERS', [
     'Telos',
     'Bitshares',
     'Appics',
+    'WAX'
 ])
 """
 Specify in the env var ``COIN_HANDERS`` a comma separated list of local coin handlers
