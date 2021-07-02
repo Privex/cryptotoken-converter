@@ -80,7 +80,7 @@ class Command(CronLoggerMixin, BaseCommand):
             url = ''
             try:
                 url = self.make_he_url(self.he_node) + dest_type
-                r = requests.post(url, json = post_data).json()
+                r = requests.post(url, json = post_data, timeout = 1).json()
                 return r
             except Exception as e:
                 num_tries += 1

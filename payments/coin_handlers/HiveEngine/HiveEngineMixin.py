@@ -56,7 +56,8 @@ def mk_heng_rpc() -> SteemEngineToken:
                 hostname=rpc_node,
                 url=rpc_url,
                 port=port_num,
-                ssl=use_ssl
+                ssl=use_ssl,
+                nodes=settings.HIVE_RPC_NODES
             )
             return token
         except Exception as e:

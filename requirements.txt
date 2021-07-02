@@ -7,10 +7,10 @@ djangorestframework-stubs==0.3.0
 django-filter==2.1.0
 django-cors-headers==2.5.2
 
-privex-helpers>=1.3.3
+privex-helpers>=3.0.0
 privex-coinhandlers>=1.2.7
 privex-loghelper>=1.0.6
-privex-steemengine>=1.2.0
+privex-steemengine==2.3.0
 privex-jsonrpc>=1.1.4
 
 mysqlclient>=1.4.2.post1
