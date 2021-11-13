@@ -1,0 +1,67 @@
+from typing import Dict, Any, List
+from eospy.cleos import Cleos
+from payments.coin_handlers.EOS.EOSMixin import EOSMixin
+import logging
+
+from payments.models import Coin
+
+log = logging.getLogger(__name__)
+
+
+class CWMixin(EOSMixin):
+    
+    chain = 'cyberway'
+    chain_type = 'cyberway'
+    chain_coin = 'CYBER'
+    
+    setting_defaults = dict(
+        host='node_test.stihi.io', username=None, password=None, endpoint='/', port=443, ssl=True, precision=4,
+        telos=False, cyberway=True, load_method='v2_actions', history_url='', v2_host='https://test.stihi.io',
+    )
+    
+    _cway = None  # type: Cleos
+
+    provides = ['CYBER']  # type: List[str]
+
+    default_contracts = {
+        'CYBER': 'cyber.token',
+    }  # type: Dict[str, str]
+
+    def __init__(self):
+        super().__init__()
+        self.current_rpc = None
+
+    @property
+    def eos(self) -> Cleos:
+        """Returns an instance of Cleos and caches it in the attribute :py:attr:`._cway` after creation"""
+        if not self._cway:
+            log.debug(f'Creating Cleos instance using CyberWay API node: {self.url}')
+            self.current_rpc = self.url
+            self._cway = Cleos(url=self.url)
+        return self._cway
+
+    def replace_eos(self, **conn) -> Cleos:
+        """
+        Destroy the EOS :class:`.Cleos` instance at :py:attr:`._eos` and re-create it with the modified
+        connection settings ``conn``
+
+        Also returns the EOS instance for convenience.
+
+        Only need to specify settings you want to override.
+
+        Example::
+
+            >>> eos = self.replace_eos(host='example.com', port=80, ssl=False)
+            >>> eos.get_account('someguy123')
+
+
+        :param conn: Connection settings. Keys: endpoint, ssl, host, port, username, password
+        :return Cleos eos: A :class:`.Cleos` instance with the modified connection settings.
+        """
+        del self._cway
+        url = self._make_url(**conn)
+        log.debug('Replacing Cleos instance with new CyberWay API node: %s', url)
+        self.current_rpc = url
+        self._cway = Cleos(url=url)
+    
+        return self._cway

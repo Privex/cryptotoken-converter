@@ -179,7 +179,10 @@ class EOSLoader(BaseLoader, EOSMixin):
                     continue  # skip foreign currency
 
                 ts = parse(tx['timestamp'])
-                ts = timezone.make_aware(ts, pytz.UTC)
+                try:
+                    ts = timezone.make_aware(ts, pytz.UTC)
+                except:
+                    log.debug(f'{ts} is already timezone aware')
 
                 yield dict(
                     txid=txid, coin=self.coins[symbol].symbol, tx_timestamp=ts, from_account=from_acc,
@@ -373,8 +376,14 @@ class EOSLoader(BaseLoader, EOSMixin):
         actions = cache.get(cache_key)
 
         if empty(actions):
-            log.info('Loading %s v2 actions for %s from node %s', self.chain.upper(), account, self.url)
-            url = f'{self.url}/v2/history/get_actions?limit={count}&account={account}'
+            v2_host = self.setting_defaults.get('v2_host') if empty(self.eos_settings.get('v2_host')) else self.eos_settings['v2_host']
+            url = ''
+            if v2_host is not None and len(v2_host) > 0:
+                log.info('Loading %s v2 actions for %s from node %s', self.chain.upper(), account, v2_host)
+                url = f'{v2_host}/v2/history/get_actions?limit={count}&account={account}'
+            else:
+                log.info('Loading %s v2 actions for %s from node %s', self.chain.upper(), account, self.url)
+                url = f'{self.url}/v2/history/get_actions?limit={count}&account={account}'
             req = requests.get(url)
             actions = req.json()['actions']
             cache.set(cache_key, actions, timeout=60)

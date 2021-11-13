@@ -75,7 +75,7 @@ class EOSMixin(SettingsMixin):
 
     setting_defaults = dict(
         host='eos.greymass.com', username=None, password=None, endpoint='/', port=443, ssl=True, precision=4,
-        telos=False, history_url='https://eos-history.privex.io', load_method='actions'
+        telos=False, cyberway=False, history_url='https://eos-history.privex.io', load_method='actions', v2_host='',
     )   # type: Dict[str, Any]
     """
     Default settings to use if any required values are empty, e.g. default to Greymass's RPC node
