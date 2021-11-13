@@ -43,7 +43,7 @@ def mk_heng_rpc() -> SteemEngineToken:
         rpc_url = '/contracts'
         if use_ssl:
             rpc_url = '/rpc/contracts'
-        history_node = 'accounts.hive-engine.com'
+        history_node = 'history.hive-engine.com'
         history_url = 'accountHistory'
         network_account = 'ssc-mainnet-hive'
         network = 'hive'
