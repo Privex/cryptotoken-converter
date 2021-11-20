@@ -26,7 +26,7 @@ cryptography>=2.6.1
 
 Faker>=1.0.4
 
-libeospy==1.1.11
+libeospy==2.1.0
 ecdsa==0.13.2
 
 bitshares==0.3.2

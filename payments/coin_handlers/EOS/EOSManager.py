@@ -1,4 +1,5 @@
 import logging
+import eospy.keys
 from datetime import timedelta, datetime
 from decimal import Decimal, getcontext, ROUND_DOWN
 from typing import Union, Tuple
@@ -180,13 +181,21 @@ class EOSManager(BaseManager, EOSMixin):
                 "permission": key_type
             }]
         }
+        log.debug(f'{payload["account"]}, {payload["name"]}, {tx_args}')
         tx_bin = self.eos.abi_json_to_bin(payload['account'], payload['name'], tx_args)
         payload['data'] = tx_bin['binargs']
         trx = dict(actions=[payload])
         log.debug(f'Full {self.chain.upper()} payload: {trx} Tx Bin: {tx_bin}')
-        trx['expiration'] = str((datetime.utcnow() + timedelta(seconds=60)).replace(tzinfo=pytz.UTC))
+        if self.setting_defaults.get('cyberway', False):
+            # CyberWay expects a slightly different timestamp format
+            trx['expiration'] = (datetime.utcnow() + timedelta(seconds=60)).strftime('%Y-%m-%dT%H:%M:%S')
+        else:
+            trx['expiration'] = str((datetime.utcnow() + timedelta(seconds=60)).replace(tzinfo=pytz.UTC))
         # Sign and broadcast the transaction we've just built
-        tfr = self.eos.push_transaction(trx, priv_key, broadcast=broadcast)
+        log.debug(f'trx = {trx}')
+        log.debug(f'priv_key = {priv_key}')
+        key = eospy.keys.EOSKey(priv_key)
+        tfr = self.eos.push_transaction(trx, key, broadcast=broadcast)
         return tfr
 
     @classmethod
