@@ -49,8 +49,10 @@ from privex.helpers import env_csv
 
 # Supply a list of one or more comma-separated Steem RPC nodes. If not set, will use the default beem nodes.
 STEEM_RPC_NODES = env_csv('STEEM_RPC_NODES', None)
-# Supply a list of one or more comma-separated Steem RPC nodes. If not set, will use the default beem nodes.
+# Supply a list of one or more comma-separated Hive RPC nodes. If not set, will use the default beem nodes.
 HIVE_RPC_NODES = env_csv('HIVE_RPC_NODES', ['https://anyx.io', 'https://hived.privex.io', 'https://hived.hive-engine.com'])
+# Supply a list of one or more comma-separated Blurt RPC nodes. If not set, will use the default beem nodes.
+BLURT_RPC_NODES = env_csv('BLURT_RPC_NODES', ['https://rpc.blurt.world'])
 # Set the shared Beem RPC instance to use the specified nodes
 steem_ins = Steem(node=STEEM_RPC_NODES, num_retries=5, num_retries_call=3, timeout=20)
 steem_ins.set_password_storage('environment')  # Get Beem wallet pass from env var ``UNLOCK``
@@ -121,7 +123,8 @@ COIN_HANDLERS = env_csv('COIN_HANDLERS', [
     'Telos',
     'Bitshares',
     'Appics',
-    'WAX'
+    'WAX',
+    'Blurt'
 ])
 """
 Specify in the env var ``COIN_HANDERS`` a comma separated list of local coin handlers
