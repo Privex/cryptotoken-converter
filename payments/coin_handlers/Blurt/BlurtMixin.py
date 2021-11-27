@@ -3,8 +3,10 @@ from typing import Optional, Dict
 from beem.asset import Asset
 from beem.blockchain import Blockchain
 from privex.helpers import empty
+from steemengine.helpers import decrypt_str
 
-from payments.coin_handlers.base import SettingsMixin
+from payments.coin_handlers.base import SettingsMixin, AuthorityMissing
+from payments.models import CryptoKeyPair
 from beem.blurt import Blurt
 from django.conf import settings
 import logging
@@ -58,13 +60,25 @@ class BlurtMixin(SettingsMixin):
             # If you've specified custom RPC nodes in the custom JSON, make a new instance with those
             # Otherwise, use the global shared_steem_instance.
             rpc_conf = dict(num_retries=5, num_retries_call=3, timeout=20, node=rpcs)
-            log.info('Getting Blurt instance for coin %s - settings: %s', symbol, rpc_conf)
+            log.info('rpc - Getting Blurt instance for coin %s - settings: %s, account: %s', symbol, rpc_conf, self.all_coins[symbol].our_account)
+            priv_key = self.get_privkey(self.all_coins[symbol].our_account)
             
-            self._rpc = Blurt(node=rpcs, keys=['xxxx'], **rpc_conf) if empty(rpcs, itr=True) else Blurt(keys=['xxxx'], **rpc_conf)  # type: Blurt
+            self._rpc = Blurt(node=rpcs, keys=[priv_key], **rpc_conf) if empty(rpcs, itr=True) else Blurt(keys=[priv_key], **rpc_conf)  # type: Blurt
             self._rpc.set_password_storage(_settings.get('pass_store', 'environment'))
             self._rpcs[symbol] = self._rpc
         return self._rpc
     
+    def get_privkey(self, account) -> str:
+        """Get private key for our gateway Blurt account"""
+        kp = CryptoKeyPair.objects.filter(network='blurt', account=account, key_type__in=['active'])
+        if len(kp) < 1:
+            raise AuthorityMissing(f'No private key found for Blurt '
+                                   f'account {account} , key type: active')
+
+        # Grab the first key pair we've found, and decrypt the private key into plain text
+        priv_key = decrypt_str(kp[0].private_key)
+        return priv_key
+
     def get_rpc(self, symbol: str) -> Blurt:
         """
         Returns a Blurt instance for querying data and sending TXs. By default, uses the Blurt shared_steem_instance.
@@ -79,8 +93,9 @@ class BlurtMixin(SettingsMixin):
             _settings = self.settings[symbol]['json']
             rpcs = _settings.get('rpcs', settings.BLURT_RPC_NODES)
             rpc_conf = dict(num_retries=5, num_retries_call=3, timeout=20, node=rpcs)
-            log.info('Getting Blurt instance for coin %s - settings: %s', symbol, rpc_conf)
-            self._rpcs[symbol] = self.rpc if empty(rpcs, itr=True) else Blurt(keys=['xxxx'], **rpc_conf)
+            log.info('get_rpc - Getting Blurt instance for coin %s - settings: %s, account: %s', symbol, rpc_conf, self.all_coins[symbol].our_account)
+            priv_key = self.get_privkey(self.all_coins[symbol].our_account)
+            self._rpcs[symbol] = self.rpc if empty(rpcs, itr=True) else Blurt(keys=[priv_key], **rpc_conf)
             self._rpcs[symbol].set_password_storage(_settings.get('pass_store', 'environment'))
         return self._rpcs[symbol]
     

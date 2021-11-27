@@ -186,6 +186,9 @@ class BlurtManager(BaseManager, BlurtMixin):
             # Various sanity checks, e.g. checking amount is valid, to/from account are valid, we have
             # enough balance to send this amt, etc.
             ###
+            if amount < Decimal('4.95'):
+                raise ArithmeticError('Cannot withdraw less than 4.95 tokens')
+
             if amount < Decimal(pow(10, -prec)):
                 log.warning('Amount %s was passed, but is lower than precision for %s', amount, sym)
                 raise ArithmeticError('Amount {} is lower than token {}s precision of {} DP'.format(amount, sym, prec))
@@ -201,6 +204,7 @@ class BlurtManager(BaseManager, BlurtMixin):
                     'Account {} has balance {} but needs {} to send this tx'.format(from_address, bal, amount)
                 )
         
+            amount = amount - Decimal('0.1') # Blurt has transactions fees, so subtract a bit to account for the fee
             ###
             # Broadcast the transfer transaction on the network, and return the necessary data
             ###
@@ -221,7 +225,7 @@ class BlurtManager(BaseManager, BlurtMixin):
                 'txid':      tx.get('transaction_id', None),
                 'coin':      self.orig_symbol,
                 'amount':    amount,
-                'fee':       Decimal(0),
+                'fee':       Decimal('0.1'),
                 'from':      from_address,
                 'send_type': 'send'
             }
