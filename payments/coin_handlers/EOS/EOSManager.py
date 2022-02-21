@@ -1,5 +1,10 @@
 import logging
 import eospy.keys
+import eospy.exceptions
+import eospy.utils
+import eospy.signer
+import eospy.types
+from eospy.schema import TransactionSchema
 from datetime import timedelta, datetime
 from decimal import Decimal, getcontext, ROUND_DOWN
 from typing import Union, Tuple
@@ -17,6 +22,51 @@ from steemengine.helpers import empty, decrypt_str
 getcontext().rounding = ROUND_DOWN
 
 log = logging.getLogger(__name__)
+
+
+# refactored for CyberWay from eospy.types.Transaction
+class CWTransaction(eospy.types.BaseObject):
+    def __init__(self, d, chain_info, lib_info):
+        ''' '''
+        # add defaults
+        if 'expiration' not in d:
+            d['expiration'] = str((dt.datetime.utcnow() + dt.timedelta(seconds=30)).replace(tzinfo=pytz.UTC))
+        if 'ref_block_num' not in d:
+            d['ref_block_num'] = chain_info['last_irreversible_block_num'] & 0xFFFF
+        if 'ref_block_prefix' not in d:
+            d['ref_block_prefix'] = lib_info['ref_block_prefix']
+        # validate
+        self._validator = TransactionSchema()
+        super(CWTransaction, self).__init__(d)
+        # parse actions
+        self.actions = self._create_obj_array(self.actions, Action)
+
+    def _encode_hdr(self):
+        ''' '''
+        # convert
+        exp_ts = (self.expiration - dt.datetime(1970, 1, 1, tzinfo=self.expiration.tzinfo)).total_seconds()
+        exp = self._encode_buffer(UInt32(exp_ts))
+        ref_blk = self._encode_buffer(UInt16(self.ref_block_num & 0xffff))
+        ref_block_prefix = self._encode_buffer(UInt32(self.ref_block_prefix))
+        net_usage_words = self._encode_buffer(VarUInt(self.net_usage_words))
+        max_cpu_usage_ms = self._encode_buffer(Byte(self.max_cpu_usage_ms))
+        max_ram_kbytes = self._encode_buffer(VarUInt(0))
+        max_storage_kbytes = self._encode_buffer(VarUInt(0))
+        delay_sec = self._encode_buffer(VarUInt(self.delay_sec))
+        # create hdr buffer
+        hdr = '{}{}{}{}{}{}{}{}'.format(exp, ref_blk, ref_block_prefix, net_usage_words, max_cpu_usage_ms, max_ram_kbytes, max_storage_kbytes, delay_sec)
+        return hdr
+
+    def encode(self):
+        ''' '''
+        hdr_buf = self._encode_hdr()
+        context_actions = self._encode_buffer(self.context_free_actions)
+        actions = self._encode_buffer(self.actions)
+        trans_exts = self._encode_buffer(self.transaction_extensions)
+        return bytearray.fromhex(hdr_buf + context_actions + actions + trans_exts)
+
+    def get_id(self):
+        return eospy.utils.sha256(self.encode())
 
 
 class EOSManager(BaseManager, EOSMixin):
@@ -149,6 +199,47 @@ class EOSManager(BaseManager, EOSMixin):
             'send_type': 'send'
         }
 
+    def cw_push_transaction(self, transaction, keys, broadcast=True, compression='none', timeout=30):
+        """
+        Specially modified version of push_transaction from the eospy library, refactored to work
+        with CyberWay.
+
+        parameter keys can be a list of WIF strings or EOSKey objects or a filename to key file
+        """
+        chain_info, lib_info = self.eos.get_chain_lib_info()
+        trx = CWTransaction(transaction, chain_info, lib_info)
+        #encoded = trx.encode()
+        digest = eospy.utils.sig_digest(trx.encode(), chain_info['chain_id'])
+        # sign the transaction
+        signatures = []
+        # if os.path.isfile(keys):
+        #      keys = parse_key_file(keys, first_key=False)
+        if not isinstance(keys, list):
+            if not isinstance(keys, eospy.signer.Signer):
+                raise eospy.exceptions.EOSKeyError('Must pass a class that extends the eospy.Signer class')
+            keys = [keys]
+
+        for key in keys:
+            # if check_wif(key) :
+            #     k = EOSKey(key)
+            if not isinstance(key, eospy.signer.Signer):
+                raise eospy.exceptions.EOSKeyError('Must pass a class that extends the eospy.Signer class')
+            signatures.append(key.sign(digest))
+        # build final trx
+        final_trx = {
+            'compression': compression,
+            'transaction': trx.__dict__,
+            'signatures': signatures
+        }
+        # changed this line of code for CyberWay
+        data = json.dumps(final_trx, cls=EOSEncoder).replace('+00:00', '')
+        print('in cw_push_transaction')
+        print('json.dumps(final_trx, cls=EOSEncoder):')
+        print(data)
+        if broadcast:
+            return self.eos.post('chain.push_transaction', params=None, data=data, timeout=timeout)
+        return data
+
     def build_tx(self, tx_type, contract, sender, tx_args: dict, key_types=None, broadcast: bool = True) -> dict:
         """
         Crafts an EOS transaction using the various arguments, signs it using the stored private key for `sender`,
@@ -186,16 +277,16 @@ class EOSManager(BaseManager, EOSMixin):
         payload['data'] = tx_bin['binargs']
         trx = dict(actions=[payload])
         log.debug(f'Full {self.chain.upper()} payload: {trx} Tx Bin: {tx_bin}')
+        key = eospy.keys.EOSKey(priv_key)
+        tfr = None
         if self.setting_defaults.get('cyberway', False):
-            # CyberWay expects a slightly different timestamp format
+            # CyberWay expects a slightly different timestamp format and transaction header
             trx['expiration'] = (datetime.utcnow() + timedelta(seconds=60)).strftime('%Y-%m-%dT%H:%M:%S')
+            log.debug(f'trx = {trx}')
+            tfr = self.cw_push_transaction(trx, key, broadcast=broadcast)
         else:
             trx['expiration'] = str((datetime.utcnow() + timedelta(seconds=60)).replace(tzinfo=pytz.UTC))
-        # Sign and broadcast the transaction we've just built
-        log.debug(f'trx = {trx}')
-        log.debug(f'priv_key = {priv_key}')
-        key = eospy.keys.EOSKey(priv_key)
-        tfr = self.eos.push_transaction(trx, key, broadcast=broadcast)
+            tfr = self.eos.push_transaction(trx, key, broadcast=broadcast)
         return tfr
 
     @classmethod
