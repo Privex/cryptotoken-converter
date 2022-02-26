@@ -10,6 +10,7 @@ from decimal import Decimal, getcontext, ROUND_DOWN
 from typing import Union, Tuple
 
 import pytz
+import json
 from requests import HTTPError
 
 from payments.coin_handlers import BaseManager
@@ -30,7 +31,7 @@ class CWTransaction(eospy.types.BaseObject):
         ''' '''
         # add defaults
         if 'expiration' not in d:
-            d['expiration'] = str((dt.datetime.utcnow() + dt.timedelta(seconds=30)).replace(tzinfo=pytz.UTC))
+            d['expiration'] = str((datetime.utcnow() + timedelta(seconds=30)).replace(tzinfo=pytz.UTC))
         if 'ref_block_num' not in d:
             d['ref_block_num'] = chain_info['last_irreversible_block_num'] & 0xFFFF
         if 'ref_block_prefix' not in d:
@@ -39,20 +40,20 @@ class CWTransaction(eospy.types.BaseObject):
         self._validator = TransactionSchema()
         super(CWTransaction, self).__init__(d)
         # parse actions
-        self.actions = self._create_obj_array(self.actions, Action)
+        self.actions = self._create_obj_array(self.actions, eospy.types.Action)
 
     def _encode_hdr(self):
         ''' '''
         # convert
-        exp_ts = (self.expiration - dt.datetime(1970, 1, 1, tzinfo=self.expiration.tzinfo)).total_seconds()
-        exp = self._encode_buffer(UInt32(exp_ts))
-        ref_blk = self._encode_buffer(UInt16(self.ref_block_num & 0xffff))
-        ref_block_prefix = self._encode_buffer(UInt32(self.ref_block_prefix))
-        net_usage_words = self._encode_buffer(VarUInt(self.net_usage_words))
-        max_cpu_usage_ms = self._encode_buffer(Byte(self.max_cpu_usage_ms))
-        max_ram_kbytes = self._encode_buffer(VarUInt(0))
-        max_storage_kbytes = self._encode_buffer(VarUInt(0))
-        delay_sec = self._encode_buffer(VarUInt(self.delay_sec))
+        exp_ts = (self.expiration - datetime(1970, 1, 1, tzinfo=self.expiration.tzinfo)).total_seconds()
+        exp = self._encode_buffer(eospy.types.UInt32(exp_ts))
+        ref_blk = self._encode_buffer(eospy.types.UInt16(self.ref_block_num & 0xffff))
+        ref_block_prefix = self._encode_buffer(eospy.types.UInt32(self.ref_block_prefix))
+        net_usage_words = self._encode_buffer(eospy.types.VarUInt(self.net_usage_words))
+        max_cpu_usage_ms = self._encode_buffer(eospy.types.Byte(self.max_cpu_usage_ms))
+        max_ram_kbytes = self._encode_buffer(eospy.types.VarUInt(0))
+        max_storage_kbytes = self._encode_buffer(eospy.types.VarUInt(0))
+        delay_sec = self._encode_buffer(eospy.types.VarUInt(self.delay_sec))
         # create hdr buffer
         hdr = '{}{}{}{}{}{}{}{}'.format(exp, ref_blk, ref_block_prefix, net_usage_words, max_cpu_usage_ms, max_ram_kbytes, max_storage_kbytes, delay_sec)
         return hdr
@@ -232,10 +233,7 @@ class EOSManager(BaseManager, EOSMixin):
             'signatures': signatures
         }
         # changed this line of code for CyberWay
-        data = json.dumps(final_trx, cls=EOSEncoder).replace('+00:00', '')
-        print('in cw_push_transaction')
-        print('json.dumps(final_trx, cls=EOSEncoder):')
-        print(data)
+        data = json.dumps(final_trx, cls=eospy.types.EOSEncoder).replace('+00:00', '')
         if broadcast:
             return self.eos.post('chain.push_transaction', params=None, data=data, timeout=timeout)
         return data
@@ -272,17 +270,14 @@ class EOSManager(BaseManager, EOSMixin):
                 "permission": key_type
             }]
         }
-        log.debug(f'{payload["account"]}, {payload["name"]}, {tx_args}')
         tx_bin = self.eos.abi_json_to_bin(payload['account'], payload['name'], tx_args)
         payload['data'] = tx_bin['binargs']
         trx = dict(actions=[payload])
-        log.debug(f'Full {self.chain.upper()} payload: {trx} Tx Bin: {tx_bin}')
         key = eospy.keys.EOSKey(priv_key)
         tfr = None
         if self.setting_defaults.get('cyberway', False):
             # CyberWay expects a slightly different timestamp format and transaction header
             trx['expiration'] = (datetime.utcnow() + timedelta(seconds=60)).strftime('%Y-%m-%dT%H:%M:%S')
-            log.debug(f'trx = {trx}')
             tfr = self.cw_push_transaction(trx, key, broadcast=broadcast)
         else:
             trx['expiration'] = str((datetime.utcnow() + timedelta(seconds=60)).replace(tzinfo=pytz.UTC))
