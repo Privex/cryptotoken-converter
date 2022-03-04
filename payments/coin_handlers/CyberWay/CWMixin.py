@@ -15,8 +15,8 @@ class CWMixin(EOSMixin):
     chain_coin = 'CYBER'
     
     setting_defaults = dict(
-        host='node_test.stihi.io', username=None, password=None, endpoint='/', port=443, ssl=True, precision=4,
-        telos=False, cyberway=True, load_method='v2_actions', history_url='', v2_host='https://test.stihi.io',
+        host='node.stihi.io', username=None, password=None, endpoint='/', port=443, ssl=True, precision=4,
+        telos=False, cyberway=True, load_method='v2_actions', history_url='', v2_host='https://stihi.io',
     )
     
     _cway = None  # type: Cleos
