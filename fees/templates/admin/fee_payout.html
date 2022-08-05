@@ -1,0 +1,34 @@
+{% extends "admin/base_site.html" %}
+{% load i18n cache static %}
+
+{% block extrastyle %}
+    {{ block.super }}
+    <link rel="stylesheet" type="text/css" href="{% static "admin/css/forms.css" %}">
+{% endblock %}
+
+{% block breadcrumbs %}
+    <div class="breadcrumbs">
+        <a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
+        &rsaquo; <a
+            href="">Fee Payout Calculator</a>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <h1>Payout</h1>
+        <table>
+            {% for p in payout %}
+                <tr><td>{{ p.coin_id }}</td><td>{{ p.amount }}</td></tr>
+            {% endfor %}
+        </table>
+        <hr/>
+        <br/>
+
+    <form action="{% url 'admin:fee_payout' %}" method="POST">
+        {% csrf_token %}
+        <div class="submit-row" style="text-align: left">
+            <input type="submit" name="submit" value="Create New Payout"/>
+        </div>
+    </form>
+
+{% endblock %}

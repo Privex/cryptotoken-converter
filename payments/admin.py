@@ -23,6 +23,8 @@ from django.views.decorators.cache import cache_page
 from django.views.generic import TemplateView
 from privex.helpers import empty, is_true
 
+from fees.admin import FeePayoutView, FeePayoutAdmin
+from fees.models import FeePayout
 from payments.models import Coin, Deposit, AddressAccountMap, CoinPair, Conversion, CryptoKeyPair
 
 """
@@ -159,6 +161,7 @@ class CustomAdmin(AdminSite):
             path('add_coin_pair/', AddCoinPairView.as_view(), name='easy_add_pair'),
             path('refund_deposits/', refund_deposits, name='refund_deposits'),
             path('_clear_cache/', clear_cache, name='clear_cache'),
+            path('fee_payout/', FeePayoutView.as_view(), name='fee_payout')
         ]
         return _urls + urls
 
@@ -277,6 +280,8 @@ ctadmin.register(Conversion, ConversionAdmin)
 ctadmin.register(Deposit, DepositAdmin)
 ctadmin.register(AddressAccountMap, AddressAccountMapAdmin)
 ctadmin.register(CryptoKeyPair, KeyPairAdmin)
+
+ctadmin.register(FeePayout, FeePayoutAdmin)
 
 
 class CoinHealthView(TemplateView):
