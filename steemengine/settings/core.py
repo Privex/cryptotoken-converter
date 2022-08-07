@@ -205,6 +205,13 @@ DATABASES = {
         'PASSWORD': env('DB_PASS', ''),
         'HOST': env('DB_HOST', 'localhost'),
     },
+    'steemengine': {
+        'ENGINE': 'django.db.backends.' + env('DB_BACKEND', 'postgresql'),
+        'NAME': env('STEEM_DB_NAME', 'steemengine_pay'),
+        'USER': env('STEEM_DB_USER', 'steemengine'),
+        'PASSWORD': env('STEEM_DB_PASS', ''),
+        'HOST': env('DB_HOST', 'localhost'),
+    }
 }
 
 # By default, caching is done in local memory of the app, which is fine for development, or small scale production.

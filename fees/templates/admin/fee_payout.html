@@ -15,10 +15,22 @@
 {% endblock %}
 
 {% block content %}
-    <h1>Payout</h1>
-        <table>
-            {% for p in payout %}
-                <tr><td>{{ p.coin_id }}</td><td>{{ p.amount }}</td></tr>
+    <h1>Claimable Fees</h1>
+
+        <table style="display: inline">
+            <tr><th>All-Time</th><td></td><td></td><td></td></tr>
+            {% for coin_id, p in payout %}
+                <tr><td>{{ coin_id }}</td><td>{{ p.amount }}</td><td>${{ p.value }}</td></tr>
+            {% endfor %}
+        </table>
+        <table style="display: inline">
+            <tr><th>Since last payout</th><td></td><td></td></tr>
+            {% for coin_id, p in payout2 %}
+                <tr><td>{{ coin_id }}</td><td>{{ p.amount }}</td><td>${{ p.value }}</td>
+                {% for coin, info in p.info.items %}
+                    <td>{{ coin }}</td><td>{{ info.current_bal }}</td>
+                {% endfor %}
+                </tr>
             {% endfor %}
         </table>
         <hr/>
