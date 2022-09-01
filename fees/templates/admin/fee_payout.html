@@ -18,21 +18,38 @@
     <h1>Claimable Fees</h1>
 
         <table style="display: inline">
-            <tr><th>All-Time</th><td></td><td></td><td></td></tr>
+            <tr><th>All-Time</th><td>All Fees</td><td>Fees - Payouts</td><td></td></tr>
             {% for coin_id, p in payout %}
-                <tr><td>{{ coin_id }}</td><td>{{ p.amount }}</td><td>${{ p.value }}</td></tr>
+                <tr><td>{{ coin_id }}</td><td>{{ p.fees|floatformat:p.decimals }}</td><td>{{ p.amount|floatformat:p.decimals }}</td><td>${{ p.value }}</td></tr>
             {% endfor %}
         </table>
         <table style="display: inline">
             <tr><th>Since last payout</th><td></td><td></td></tr>
             {% for coin_id, p in payout2 %}
-                <tr><td>{{ coin_id }}</td><td>{{ p.amount }}</td><td>${{ p.value }}</td>
+            <tr><td>{{ coin_id }}</td><td>{{ p.amount|floatformat:p.decimals }}</td><td>${{ p.value }}</td><!--<td>{{ p.unused|floatformat:p.decimals }}</td>
                 {% for coin, info in p.info.items %}
-                    <td>{{ coin }}</td><td>{{ info.current_bal }}</td>
-                {% endfor %}
+                <td>{{ coin }} - bal: {{ info.current_bal|floatformat:p.decimals }} supply: {{ info.circ_supply|floatformat:p.decimals }}</td>
+                {% endfor %}-->
                 </tr>
             {% endfor %}
         </table>
+        <table style="display: inline">
+            <tr><th>Coin</th><th>Unused</th></tr>
+            {% for coin_id, u in unused.items %}
+            <tr><td>{{ coin_id }}</td>
+                <td>{{ u.unused|floatformat:u.decimals }}</td>
+                {% for name, bal in u.balances %}
+                <td>{{ name }}: {{ bal|floatformat:u.decimals }}</td>
+                {% endfor %}
+            </tr>
+            {% endfor %}
+        </table>
+        <!--<table style="display: inline">
+            <tr><th>Coin</th><th>Price</th></tr>
+            {% for coin_id, p in prices.items %}
+            <tr><td>{{ coin_id }}</td><td>{{ p }}</td></tr>
+            {% endfor %}
+        </table>-->
         <hr/>
         <br/>
 

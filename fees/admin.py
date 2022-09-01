@@ -1,6 +1,8 @@
+import json
 import logging
 from decimal import Decimal
 
+import requests
 from django.contrib import admin
 from django.core.exceptions import PermissionDenied
 from django.db.models.aggregates import Sum
@@ -9,6 +11,7 @@ from django.shortcuts import redirect
 from django.template.response import TemplateResponse
 from django.views.generic.base import TemplateView
 from privex.helpers import DictObject, r_cache
+from requests import Session, Timeout, TooManyRedirects
 
 from fees.models import FeePayout
 from payments.coin_handlers import get_loader, get_manager
@@ -19,123 +22,145 @@ from payments.models import Conversion, Coin
 log = logging.getLogger(__name__)
 
 
-def get_payout(since='1970-01-01'):
-    qs_pay = FeePayout.objects.values('coin').filter(created_at__gt=since)
+
+def get_payout(since='1970-01-01', group_like_coins=False):
+    qs_pay = FeePayout.objects.values('coin_id').filter(created_at__gt=since)
     qs_fee = Conversion.objects.values('from_coin_id').filter(created_at__gt=since)
-    payouts = {Coin.objects.get(symbol=fp['coin']): fp['fee'] for fp in qs_pay.annotate(fee=Sum('amount'))}
-    fees = {c['from_coin']: c['fee'] for c in qs_fee.annotate(fee=Sum('ex_fee'))}
-    #payouts_steem = {Coin.objects.using('steemengine').get(symbol=fp['coin']): fp['fee'] for fp in qs_pay.using('steemengine').annotate(fee=Sum('amount'))}
-    #fees_steem = {c['from_coin']: c['fee'] for c in qs_fee.using('steemengine').annotate(fee=Sum('ex_fee'))}
+    payouts = {p['coin_id']: p['fee'] for p in qs_pay.annotate(fee=Sum('amount'))}
+    fees = {f['from_coin_id']: f['fee'] for f in qs_fee.annotate(fee=Sum('ex_fee'))}
     all_coins = [dict(coin_id=coin, amount=fees[coin]) for coin in fees.keys()] + \
                 [dict(coin_id=coin, amount=-payouts[coin]) for coin in payouts.keys()]
-               # [dict(coin_id=coin, amount=fees_steem[coin]) for coin in fees_steem.keys()] + \
-               # [dict(coin_id=coin, amount=-payouts_steem[coin]) for coin in payouts_steem.keys()]
     summary = {}
     for payout in all_coins:
-        try:
-            coin = Coin.objects.get(symbol=payout['coin_id'])
-            native_coin = coin.symbol_id
-            network = 'hive'
-        except Coin.DoesNotExist:
-            coin = Coin.objects.using('steemengine').get(symbol=payout['coin_id'])
-            native_coin = coin.symbol_id
-            network = 'steem'
-        if coin.symbol_id.startswith('GOLOS'):
+        coin = Coin.objects.get(symbol=payout['coin_id'])
+        if 'GOLOS' in coin.symbol_id:
             continue
-        if payout['coin_id'].startswith('SWAP.'):
-            native_coin = payout['coin_id'].split('.')[1]
-        elif payout['coin_id'].endswith('P'):
-            native_coin = payout['coin_id'][:-1]
-        if native_coin.endswith('P'):
-            native_coin = native_coin[:-1]
-        if native_coin == 'BRIDGE.BTC':
-            native_coin = 'BRIDGEBTC'
-        if native_coin in summary:
-            summary[native_coin]['amounts'][coin.symbol] = payout['amount']
-            summary[native_coin]['info'][coin.symbol] = get_coin_info(coin, network)
+        coin_id = payout['coin_id']
+        # collect info
+        if coin_id in summary:
+            if payout['amount'] > 0:
+                summary[coin_id]['fees'] += payout['amount']
+            if coin.symbol in summary[coin_id]['amounts']:
+                summary[coin_id]['amounts'][coin.symbol] += payout['amount']
+            else:
+                summary[coin_id]['amounts'][coin.symbol] = payout['amount']
         else:
-            summary[native_coin] = dict(
+            rate = get_price(coin_id)
+            if rate == 0:
+                if 'SWAP.' in coin_id:
+                    rate = get_price(coin_id[5:])
+                if 'BTCP' == coin_id:
+                    rate = get_price('BTC')
+            summary[coin_id] = dict(
                 amounts={coin.symbol: payout['amount']},
-                rate=get_price(native_coin, network),
-                info={coin.symbol: get_coin_info(coin, network)},
+                rate=rate,
+                fees=max(payout['amount'], 0)
             )
-        if coin.symbol_id == 'BTCP':
-            print(summary[native_coin])
-
-    for native_coin in summary:
-        summary[native_coin]['amount'] = f"{sum(summary[native_coin]['amounts'].values()):.2f}"
-        summary[native_coin]['value'] = f"{summary[native_coin]['rate'] * Decimal(summary[native_coin]['amount']):.2f}"
-        try:
-            #qs_c = Coin.objects
-            #if network == 'steem':
-            #    qs_c = qs_c.using('steemengine')
-            #coin = qs_c.get(symbol=native_coin)
-            #print(native_coin)
-            #print([info for sym, info in summary[native_coin]['info'].items() if sym != coin.symbol_id])
-            summary[native_coin]['unused'] = - Decimal(sum([info['outstanding'] for sym, info in summary[native_coin]['info'].items() if sym != native_coin]))
-        except Exception:
-            log.exception(native_coin)
-            log.info(summary[native_coin]['info'])
+    # summarize
+    for coin_id in summary:
+        #summary[coin_id]['info'] = info[coin_id]
+        summary[coin_id]['decimals'] = 4 if 'BTC' in coin_id else 2
+        summary[coin_id]['amount'] = sum(summary[coin_id]['amounts'].values())
+        summary[coin_id]['value'] = f"{summary[coin_id]['rate'] * Decimal(summary[coin_id]['amount']):.2f}"
+        summary[coin_id]['balances'] = get_coin_balances(Coin.objects.get(symbol=coin_id))
     return sorted(summary.items(), key=lambda i: Decimal(i[1]['value']), reverse=True)
 
 
-@r_cache(lambda coin, network: f'info:{coin}')
-def get_coin_info(coin, network):
-    info = dict(
-        current_bal = 0,
-        circ_supply =0,
-        outstanding =0, # real circ
-        unused =0,
-        )
-    s = SteemEngineToken(network=network)
+@r_cache(lambda coin: f'info:{coin}', cache_time=3600*6)
+def get_coin_balances(coin):
+    balances = []
     try:
         if coin.our_account is None:
-            info['current_bal'] = f'{get_manager(coin.symbol_id).rpc.getbalance():.2f}'
-        elif network == 'hive':
-            info['current_bal'] = f'{get_manager(coin.symbol_id).balance(coin.our_account):.2f}'
+            balances = [('RPC bal', Decimal(get_manager(coin.symbol_id).rpc.getbalance()))]
         else:
-            if coin.symbol_id == 'BTCP':
-                coin.our_account = 'btcpeg'
-                log.info(f"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA {s.get_token_balance('btcpeg', 'BTCP')}")
-            log.info(f'getting token balance of {coin.symbol_id} {network} {coin.our_account}')
-            info['current_bal'] = f'{s.get_token_balance(coin.our_account, coin.symbol_id):.2f}'
+            balances = [('HE bal', Decimal(get_manager(coin.symbol_id).balance(coin.our_account)))]
     except Exception:
         log.exception(f'unable to get balance for {coin.symbol_id} {coin.our_account}')
-        info['current_bal'] = 0
-
-    try:
-        token_info = s.get_token(coin.symbol_id)
-        info['circ_supply'] = token_info['circulating_supply']
-        info['outstanding'] = info['circ_supply'] - Decimal(info['current_bal'])
-    except Exception:
-        pass
-    return info
-
-
-@r_cache(lambda coin, network: f'price:{network}:{coin}')
-def get_price(coin, network):
-    if network == 'steem':
-        fake_coin = coin + 'P'
-    elif network == 'hive':
-        fake_coin = 'SWAP.' + coin
-    if coin == 'APX':
-        return Decimal(0.00695810)
-    try:
-        rate = SteemEngineToken(network=network).get_ticker(fake_coin).lastPrice
-    except NoResults:
+    #if coin.symbol == 'BTCP' or 'EOS' in 'coin.symbol':
+    #    return
+    if coin.symbol.startswith('SWAP.'):
         try:
-            rate = SteemEngineToken(network=network).get_ticker(coin).lastPrice
-        except (NoResults, Exception):
-            rate = 0
-    except Exception:
-        rate = 0
-    return rate
+            token_info = SteemEngineToken(network='hive').get_token(coin.symbol)
+            balances.append(('HE sup', -Decimal(token_info['circulating_supply'])))
+        except Exception:
+            log.exception(f'unable to get supply for {coin.symbol_id}')
+            pass
+    elif not coin.symbol.endswith('P'):  # native
+        try:
+            for sc in Coin.objects.using('steemengine').filter(coin_type='steemengine', symbol__contains=get_native_coin(coin.symbol)):
+                s = SteemEngineToken(network='steem')
+                balances.append(('SE sup', -Decimal(s.get_token(sc.symbol)['circulating_supply'])))
+                balances.append(('SE bal', Decimal(s.get_token_balance(sc.our_account, sc.symbol))))
+        except Exception:
+            log.exception(f'Unable to get Steem-Engine balances for {coin.symbol}')
+    else:  # btcp
+        pass
+    return balances
+
+
+def get_price(coin: str):
+    if coin == 'SAND':
+        return Decimal(0.000851225622)
+    if coin == 'WAX':
+        coin = 'WAXP'
+    data = get_coinmarketcap_data()
+    for listing in data:
+        if listing['symbol'] == coin:
+            return Decimal(listing['quote']['USD']['price'])
+    else:
+        return Decimal(0)
+
+
+@r_cache('cmc_data', cache_time=3600*24)
+def get_coinmarketcap_data():
+    url = 'https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest'
+    parameters = {
+        'start': '1',
+        'limit': '5000',
+        'convert': 'USD'
+    }
+    headers = {
+        'Accepts': 'application/json',
+        'X-CMC_PRO_API_KEY': '2b653ab6-2fe2-4ff5-8536-88666fce9e1d',
+    }
+
+    session = Session()
+    session.headers.update(headers)
+
+    try:
+        data = []
+        for i in range(0, 3):
+            parameters['start'] = i*5000 + 1
+            response = session.get(url, params=parameters)
+            data = data + json.loads(response.text)['data']
+        return data
+    except (ConnectionError, Timeout, TooManyRedirects) as e:
+        log.error('Unable to get CMC Listings')
 
 
 class FeePayoutAdmin(admin.ModelAdmin):
     list_display = ('coin', 'amount', 'created_at')
     list_filter = ('coin', 'created_at')
     ordering = ('created_at', 'updated_at')
+
+
+def get_native_coin(k):
+    if 'SWAP.' in k:
+        native_coin = k[5:]
+    elif k.endswith('P'):
+        native_coin = k[:-1]
+    else:
+        native_coin = k
+    return native_coin
+
+
+def get_unused(payout):
+    unused = {coin_id: dict(unused=0, decimals=v['decimals'], balances=[]) for coin_id, v in payout if
+              not (coin_id.startswith('SWAP.') or coin_id.endswith('P'))}
+    for k, v in payout:
+        unused[get_native_coin(k)]['balances'].extend(v['balances'])
+        unused[get_native_coin(k)]['unused'] += sum([bal for name, bal in v['balances']])
+    return unused
 
 
 class FeePayoutView(TemplateView):
@@ -148,6 +173,8 @@ class FeePayoutView(TemplateView):
         context = super(FeePayoutView, self).get_context_data(**kwargs)
         context['payout'] = get_payout()
         context['payout2'] = get_payout(FeePayout.objects.order_by('-created_at')[0].created_at)
+        context['unused'] = get_unused(context['payout'])
+        #context['prices'] = {coin: price for coin in context['payout']}
         return context
 
     def get(self, request, *args, **kwargs):
@@ -162,5 +189,5 @@ class FeePayoutView(TemplateView):
         u = r.user
         if not u.is_authenticated or not u.is_superuser:
             raise PermissionDenied
-        FeePayout.objects.bulk_create([FeePayout(**p) for p in get_payout()])
+        FeePayout.objects.bulk_create([FeePayout(**{x: y for x, y in p}) for p in get_payout()])
         return redirect('admin:fee_payout')
