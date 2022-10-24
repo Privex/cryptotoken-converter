@@ -81,10 +81,13 @@ class Command(CronLoggerMixin, BaseCommand):
             try:
                 url = self.make_he_url(self.he_node) + dest_type
                 r = requests.post(url, json = post_data, timeout = 1).json()
+                if r['result'] is None:
+                    log.error('connected to but got null data response from %s', url)
+                    raise Exception("no data")
                 return r
             except Exception as e:
                 num_tries += 1
-                log.error('unable to connect to %s (attempt %s)', url, str(num_tries))
+                log.error('unable to get data from %s (attempt %s)', url, str(num_tries))
                 if num_tries <= 5:
                     self.he_node += 1
                     if self.he_node >= len(settings.HE_RPC_NODES):
@@ -106,6 +109,11 @@ class Command(CronLoggerMixin, BaseCommand):
         return block_info['result']
 
     def is_trx_verified(self, tx: dict) -> bool:
+        # special case: skip this one particular invalid KANDA transaction to cut down on log noise
+        if tx['txid'] == '5c4b07ec9e368728913db9128df93d879d05b3bd':
+            log.info('skipping bad KANDA tx id %s', tx['txid'])
+            return False
+
         log.info('verifying tx %s', str(tx))
         tx_info = self.get_tx_info(tx['txid'])
         block_num = tx_info['blockNumber']

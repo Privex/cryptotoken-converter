@@ -223,28 +223,37 @@ class SteemEngineManager(BaseManager, SteemEngineMixin):
         """
 
         try:
-            rpc = self.get_rpc(self.symbol)
-            token = rpc.get_token(symbol=self.symbol)
+            num_retries = 0
+            while True:
+                try:
+                    rpc = self.get_rpc(self.symbol)
+                    token = rpc.get_token(symbol=self.symbol)
 
-            # If we get passed a float for some reason, make sure we trim it to the token's precision before
-            # converting it to a Decimal.
-            if type(amount) == float:
-                amount = ('{0:.' + str(token['precision']) + 'f}').format(amount)
-            amount = Decimal(amount)
-            issuer = rpc.get_token(self.symbol)['issuer']
-            log.info('Issuing %f %s to @%s', amount, self.symbol, address)
-            t = rpc.issue_token(symbol=self.symbol, to=address, amount=amount)
-            txid = None     # There's a risk we can't get the TXID, and so we fall back to None.
-            if 'transaction_id' in t:
-                txid = t['transaction_id']
-            return {
-                'txid': txid,
-                'coin': self.orig_symbol,
-                'amount': amount,
-                'fee': Decimal(0),
-                'from': issuer,
-                'send_type': 'issue'
-            }
+                    # If we get passed a float for some reason, make sure we trim it to the token's precision before
+                    # converting it to a Decimal.
+                    if type(amount) == float:
+                        amount = ('{0:.' + str(token['precision']) + 'f}').format(amount)
+                    amount = Decimal(amount)
+                    issuer = rpc.get_token(self.symbol)['issuer']
+                    log.info('Issuing %f %s to @%s', amount, self.symbol, address)
+                    t = rpc.issue_token(symbol=self.symbol, to=address, amount=amount)
+                    txid = None     # There's a risk we can't get the TXID, and so we fall back to None.
+                    if 'transaction_id' in t:
+                        txid = t['transaction_id']
+                    return {
+                        'txid': txid,
+                        'coin': self.orig_symbol,
+                        'amount': amount,
+                        'fee': Decimal(0),
+                        'from': issuer,
+                        'send_type': 'issue'
+                    }
+                except MissingKeyError:
+                    raise
+                except:
+                    num_retries += 1
+                    if num_retries >= 5:
+                        raise
         except SENG.AccountNotFound as e:
             raise exceptions.AccountNotFound(str(e))
         except MissingKeyError:
@@ -290,30 +299,41 @@ class SteemEngineManager(BaseManager, SteemEngineMixin):
                 raise AttributeError("Both 'from_address' and 'coin.our_account' are empty. Cannot send.")
             from_address = self.coin.our_account
         try:
-            rpc = self.get_rpc(self.symbol)
-            token = rpc.get_token(symbol=self.symbol)
+            num_retries = 0
+            while True:
+                try:
+                    rpc = self.get_rpc(self.symbol)
+                    token = rpc.get_token(symbol=self.symbol)
 
-            # If we get passed a float for some reason, make sure we trim it to the token's precision before
-            # converting it to a Decimal.
-            if type(amount) == float:
-                amount = ('{0:.' + str(token['precision']) + 'f}').format(amount)
-            amount = Decimal(amount)
+                    # If we get passed a float for some reason, make sure we trim it to the token's precision before
+                    # converting it to a Decimal.
+                    if type(amount) == float:
+                        amount = ('{0:.' + str(token['precision']) + 'f}').format(amount)
+                    amount = Decimal(amount)
 
-            log.debug('Sending %f %s to @%s', amount, self.symbol, address)
+                    log.debug('Sending %f %s to @%s', amount, self.symbol, address)
 
-            t = rpc.send_token(symbol=self.symbol, from_acc=from_address,
-                               to_acc=address, amount=amount, memo=memo)
-            txid = None  # There's a risk we can't get the TXID, and so we fall back to None.
-            if 'transaction_id' in t:
-                txid = t['transaction_id']
-            return {
-                'txid': txid,
-                'coin': self.orig_symbol,
-                'amount': amount,
-                'fee': Decimal(0),
-                'from': from_address,
-                'send_type': 'send'
-            }
+                    t = rpc.send_token(symbol=self.symbol, from_acc=from_address,
+                                       to_acc=address, amount=amount, memo=memo)
+                    txid = None  # There's a risk we can't get the TXID, and so we fall back to None.
+                    if 'transaction_id' in t:
+                        txid = t['transaction_id']
+                    return {
+                        'txid': txid,
+                        'coin': self.orig_symbol,
+                        'amount': amount,
+                        'fee': Decimal(0),
+                        'from': from_address,
+                        'send_type': 'send'
+                    }
+                except SENG.NotEnoughBalance:
+                    raise
+                except MissingKeyError:
+                    raise
+                except:
+                    num_retries += 1
+                    if num_retries >= 5:
+                        raise
         except SENG.AccountNotFound as e:
             raise exceptions.AccountNotFound(str(e))
         except SENG.TokenNotFound as e:
