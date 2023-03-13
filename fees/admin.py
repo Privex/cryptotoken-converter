@@ -5,6 +5,7 @@ from decimal import Decimal
 import requests
 from django.contrib import admin
 from django.core.exceptions import PermissionDenied
+from django.db.models import Q
 from django.db.models.aggregates import Sum
 from django.db.models.query import QuerySet
 from django.shortcuts import redirect
@@ -22,8 +23,7 @@ from payments.models import Conversion, Coin
 log = logging.getLogger(__name__)
 
 
-
-def get_payout(since='1970-01-01', group_like_coins=False):
+def get_payout(since='1970-01-01', sort=True):
     qs_pay = FeePayout.objects.values('coin_id').filter(created_at__gt=since)
     qs_fee = Conversion.objects.values('from_coin_id').filter(created_at__gt=since)
     payouts = {p['coin_id']: p['fee'] for p in qs_pay.annotate(fee=Sum('amount'))}
@@ -63,7 +63,10 @@ def get_payout(since='1970-01-01', group_like_coins=False):
         summary[coin_id]['amount'] = sum(summary[coin_id]['amounts'].values())
         summary[coin_id]['value'] = f"{summary[coin_id]['rate'] * Decimal(summary[coin_id]['amount']):.2f}"
         summary[coin_id]['balances'] = get_coin_balances(Coin.objects.get(symbol=coin_id))
-    return sorted(summary.items(), key=lambda i: Decimal(i[1]['value']), reverse=True)
+    if sort:
+        return sorted(summary.items(), key=lambda i: Decimal(i[1]['value']), reverse=True)
+    else:
+        return summary
 
 
 @r_cache(lambda coin: f'info:{coin}', cache_time=3600*6)
@@ -73,7 +76,7 @@ def get_coin_balances(coin):
         if coin.our_account is None:
             balances = [('RPC bal', Decimal(get_manager(coin.symbol_id).rpc.getbalance()))]
         else:
-            balances = [('HE bal', Decimal(get_manager(coin.symbol_id).balance(coin.our_account)))]
+            balances = [(coin.symbol_id + ' bal', Decimal(get_manager(coin.symbol_id).balance(coin.our_account)))]
     except Exception:
         log.exception(f'unable to get balance for {coin.symbol_id} {coin.our_account}')
     #if coin.symbol == 'BTCP' or 'EOS' in 'coin.symbol':
@@ -81,18 +84,19 @@ def get_coin_balances(coin):
     if coin.symbol.startswith('SWAP.'):
         try:
             token_info = SteemEngineToken(network='hive').get_token(coin.symbol)
-            balances.append(('HE sup', -Decimal(token_info['circulating_supply'])))
+            balances.append((coin.symbol + ' sup', -Decimal(token_info['circulating_supply'])))
         except Exception:
             log.exception(f'unable to get supply for {coin.symbol_id}')
-            pass
     elif not coin.symbol.endswith('P'):  # native
-        try:
-            for sc in Coin.objects.using('steemengine').filter(coin_type='steemengine', symbol__contains=get_native_coin(coin.symbol)):
-                s = SteemEngineToken(network='steem')
-                balances.append(('SE sup', -Decimal(s.get_token(sc.symbol)['circulating_supply'])))
-                balances.append(('SE bal', Decimal(s.get_token_balance(sc.our_account, sc.symbol))))
-        except Exception:
-            log.exception(f'Unable to get Steem-Engine balances for {coin.symbol}')
+        se = SteemEngineToken(network='steem')
+        for sec in Coin.objects.using('steemengine').filter(
+            coin_type='steemengine').filter(Q(symbol=get_native_coin(coin.symbol) + 'P') |
+                                            Q(symbol='SWAP.' + get_native_coin(coin.symbol))):
+            try:
+                balances.append((sec.symbol + ' sup' + sec.symbol, -Decimal(se.get_token(sec.symbol)['circulating_supply'])))
+                balances.append((sec.symbol + ' bal', Decimal(se.get_token_balance(sec.our_account, sec.symbol))))
+            except Exception:
+                log.exception(f'Unable to get Steem-Engine balances for {coin.symbol} ({sec.symbol})')
     else:  # btcp
         pass
     return balances
@@ -149,6 +153,8 @@ def get_native_coin(k):
         native_coin = k[5:]
     elif k.endswith('P'):
         native_coin = k[:-1]
+    elif k.startswith('EOS') and len(k) > 3:
+        native_coin = k[3:]
     else:
         native_coin = k
     return native_coin
@@ -159,8 +165,52 @@ def get_unused(payout):
               not (coin_id.startswith('SWAP.') or coin_id.endswith('P'))}
     for k, v in payout:
         unused[get_native_coin(k)]['balances'].extend(v['balances'])
-        unused[get_native_coin(k)]['unused'] += sum([bal for name, bal in v['balances']])
+        unused[get_native_coin(k)]['unused'] += sum([bal[1] for bal in v['balances']])
     return unused
+
+
+def get_payout_table():
+    payout = get_payout(FeePayout.objects.values('created_at').order_by('-created_at').first()['created_at'], sort=False)
+    payout_table = {}
+    for coin, pr in payout.items():
+        payout_table[coin] = dict(
+            native=get_native_coin(coin) == coin,
+            price=pr.get('rate', ''),
+            decimals=pr['decimals'],
+            fee_amount=pr['amount'],
+            total_fees=pr['amount'],
+        )
+    for coin, pr in payout_table.items():
+        if not pr['native']:
+            payout_table[get_native_coin(coin)]['total_fees'] += pr['fee_amount']
+    privex_share = Decimal(0.25)
+    he_share = Decimal(0.75)
+    for coin, pr in payout_table.items():
+        if pr['native']:
+            pr['value'] = pr['total_fees'] * pr['price']
+            pr['privex_cut'] = pr['total_fees'] * privex_share
+            try:
+                swap_coin = Coin.objects.get(symbol_id='SWAP.' + coin)
+                pr['he_cut'] = max(pr['total_fees'] * he_share - Decimal(
+                    get_manager(swap_coin.symbol_id).balance(swap_coin.our_account)), 0)
+                if pr['he_cut'] == 0:
+                    del pr['he_cut']
+            except Coin.DoesNotExist:
+                pass
+        else:
+            pr['value'] = ''
+            try:
+                swap_coin = Coin.objects.get(symbol_id=coin)
+                pr['he_balance'] = Decimal(get_manager(swap_coin.symbol_id).balance(swap_coin.our_account))
+                pr['he_cut'] = min(payout_table[get_native_coin(coin)]['total_fees'] * he_share, pr['he_balance'])
+            except Coin.DoesNotExist:
+                pass
+            pr['total_fees'] = ''
+    coins = ['LTC', 'BTC', 'HBD', 'WAX', 'DOGE', 'STEEM', 'BLURT', 'BCH', 'EOS']
+    return filter(lambda t: t[0] in coins or get_native_coin(t[0]) in coins,
+                  sorted(payout_table.items(),
+                         key=lambda i: (Decimal(0.00000001) if 'SWAP' in i[0] else Decimal(1)) * i[1]['price'],
+                         reverse=True))
 
 
 class FeePayoutView(TemplateView):
@@ -174,6 +224,7 @@ class FeePayoutView(TemplateView):
         context['payout'] = get_payout()
         context['payout2'] = get_payout(FeePayout.objects.order_by('-created_at')[0].created_at)
         context['unused'] = get_unused(context['payout'])
+        context['payout_table'] = get_payout_table()
         #context['prices'] = {coin: price for coin in context['payout']}
         return context
 
@@ -185,9 +236,13 @@ class FeePayoutView(TemplateView):
         return super(FeePayoutView, self).get(request, *args, **kwargs)
 
     def post(self, request, *args, **kwargs):
-        r = self.request
-        u = r.user
+        p = self.request
+        u = p.user
         if not u.is_authenticated or not u.is_superuser:
             raise PermissionDenied
-        FeePayout.objects.bulk_create([FeePayout(**{x: y for x, y in p}) for p in get_payout()])
+        for coin, p in self.get_context_data()['payout_table']:
+            if p.get('he_cut', 0):
+                FeePayout(coin_id=coin, amount=p['he_cut'], notes='hive engine').save()
+            if p.get('privex_cut', 0):
+                FeePayout(coin_id=coin, amount=p['privex_cut'], notes='privex').save()
         return redirect('admin:fee_payout')

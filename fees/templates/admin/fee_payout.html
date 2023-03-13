@@ -44,6 +44,20 @@
             </tr>
             {% endfor %}
         </table>
+        <table style="display: inline">
+            <tr><th>Coin</th><th>Price</th><th>Fee Amount</th><th>Total Fees</th><th>Total Value USD</th><th>Privex Cut</th><th>HE Cut</th><th>HE Balance</th></tr>
+            {% for coin_id, p in payout_table %}
+            <tr><td>{{ coin_id }}</td>
+                <td>${{ p.price|floatformat:2 }}</td>
+                <td>{{ p.fee_amount|floatformat:p.decimals }}</td>
+                <td>{{ p.total_fees|floatformat:p.decimals }}</td>
+                <td>{{ p.value|floatformat:2 }}</td>
+                <td>{{ p.privex_cut|floatformat:p.decimals }}</td>
+                <td>{{ p.he_cut|floatformat:p.decimals }}</td>
+                <td>{{ p.he_balance|floatformat:p.decimals }}</td>
+            </tr>
+            {% endfor %}
+        </table>
         <!--<table style="display: inline">
             <tr><th>Coin</th><th>Price</th></tr>
             {% for coin_id, p in prices.items %}
@@ -52,7 +66,6 @@
         </table>-->
         <hr/>
         <br/>
-
     <form action="{% url 'admin:fee_payout' %}" method="POST">
         {% csrf_token %}
         <div class="submit-row" style="text-align: left">
