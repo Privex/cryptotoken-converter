@@ -3,7 +3,8 @@ import logging
 from decimal import Decimal
 
 import requests
-from django.contrib import admin
+from django.contrib import admin, messages
+from django.contrib.messages import add_message
 from django.core.exceptions import PermissionDenied
 from django.db.models import Q
 from django.db.models.aggregates import Sum
@@ -23,6 +24,60 @@ from payments.models import Conversion, Coin
 log = logging.getLogger(__name__)
 
 
+def send_payout(modeladmin, request, queryset: QuerySet):
+    if len(queryset) < 1:
+        add_message(
+            request, messages.ERROR,
+            'No payouts selected.'
+        )
+        redirect(request.build_absolute_uri())
+    privex_wallets = {
+        'BTC': 'bc1q2wjjd0fqqhf5uzy43kqyf5vsm37st8q8zuj8r4lyav3zyvvh3ytql736tu',
+        'LTC': 'LWY6hPyHP98NdZMXFKn7EvmptQnUnsNvWv',
+        'BCH': 'bitcoincash:prg0x58fkeln865q8fpse7r9zh5pyuqhdq5s5gv5k8',
+        'EOS': 'privexinceos',
+        'HBD': 'privex',
+        'DOGE': 'DAeWUsC1Kr8R1EES8XnzLJvtfAN9iLjhZu',
+        'WAX': 'privexinceos',
+        'BLURT': 'privex'
+    }
+    he_wallets = {
+        'BTC': 'bc1q324jejrpmyd23ejflhrluemsatuxa3ghuk5w3m',
+        'LTC': 'MQxmGYkWK44Lwf38KSmxj7JNSt3B4P9wae',
+        'BCH': 'bitcoincash:qznd0v0exhatqqpymtl8frqp4sfly6dmlvv8jva9hm',
+        'EOS': '',
+        'HBD': 'hive-engine',
+        'DOGE': 'D695r3CS7LM8CJSRFMRcyGFxxww1wEy9gY',
+        'WAX': '',
+        'BLURT': ('blurt-swap', 'SWAP.BLURT hive-engine'),
+    }
+    for d in queryset:  # type: FeePayout
+        try:
+            if d.notes == 'privex':
+                if d.coin.symbol.startswith('SWAP.'):
+                    address = 'privex'
+                else:
+                    address = privex_wallets[d.coin.symbol]
+            elif d.notes == 'hive engine':
+                if d.coin.symbol.startswith('SWAP.'):
+                    address = 'hive-engine'
+                else:
+                    address = he_wallets[d.coin.symbol]
+            else:
+                add_message(request, messages.ERROR, f'Unable to read notes during payout: {d} {d.notes}')
+                continue
+            if type(address) is tuple:
+                add_message(request, messages.INFO, f"Sent {d.amount} {d.coin.symbol} to {address[0]}, memo: {address[1]}")
+                #get_manager(d.coin.symbol_id).send(d.amount, address=address[0], memo=address[1])
+            elif address:
+                add_message(request, messages.INFO, f"Sent {d.amount} {d.coin.symbol} to {address[0]}")
+                #get_manager(d.coin.symbol_id).send(d.amount, address=address)
+        except Exception as e:
+            log.exception(f'Error while paying out {d}')
+            add_message(request, messages.ERROR, f"Unable to pay out: {d}")
+    return redirect(request.build_absolute_uri())
+
+
 def get_payout(since='1970-01-01', sort=True):
     qs_pay = FeePayout.objects.values('coin_id').filter(created_at__gt=since)
     qs_fee = Conversion.objects.values('from_coin_id').filter(created_at__gt=since)
@@ -33,7 +88,7 @@ def get_payout(since='1970-01-01', sort=True):
     summary = {}
     for payout in all_coins:
         coin = Coin.objects.get(symbol=payout['coin_id'])
-        if 'GOLOS' in coin.symbol_id:
+        if not coin.enabled:
             continue
         coin_id = payout['coin_id']
         # collect info
@@ -69,37 +124,32 @@ def get_payout(since='1970-01-01', sort=True):
         return summary
 
 
-@r_cache(lambda coin: f'info:{coin}', cache_time=3600*6)
 def get_coin_balances(coin):
-    balances = []
+    he = Coin.objects.filter(symbol='SWAP.' + get_native_coin(coin.symbol))
+    se = Coin.objects.using('steemengine').filter(symbol=get_native_coin(coin.symbol) + 'P', coin_type='steemengine')
+    balances = [get_coin_balance(coin)]
     try:
-        if coin.our_account is None:
-            balances = [('RPC bal', Decimal(get_manager(coin.symbol_id).rpc.getbalance()))]
-        else:
-            balances = [(coin.symbol_id + ' bal', Decimal(get_manager(coin.symbol_id).balance(coin.our_account)))]
+        balances += [get_coin_balance(hec, 'hive') for hec in he] + [get_coin_supply(hec, 'hive') for hec in he]
+        balances += [get_coin_balance(sec, 'steem') for sec in se] + [get_coin_supply(sec, 'steem') for sec in se]
     except Exception:
-        log.exception(f'unable to get balance for {coin.symbol_id} {coin.our_account}')
-    #if coin.symbol == 'BTCP' or 'EOS' in 'coin.symbol':
-    #    return
-    if coin.symbol.startswith('SWAP.'):
-        try:
-            token_info = SteemEngineToken(network='hive').get_token(coin.symbol)
-            balances.append((coin.symbol + ' sup', -Decimal(token_info['circulating_supply'])))
-        except Exception:
-            log.exception(f'unable to get supply for {coin.symbol_id}')
-    elif not coin.symbol.endswith('P'):  # native
-        se = SteemEngineToken(network='steem')
-        for sec in Coin.objects.using('steemengine').filter(
-            coin_type='steemengine').filter(Q(symbol=get_native_coin(coin.symbol) + 'P') |
-                                            Q(symbol='SWAP.' + get_native_coin(coin.symbol))):
-            try:
-                balances.append((sec.symbol + ' sup' + sec.symbol, -Decimal(se.get_token(sec.symbol)['circulating_supply'])))
-                balances.append((sec.symbol + ' bal', Decimal(se.get_token_balance(sec.our_account, sec.symbol))))
-            except Exception:
-                log.exception(f'Unable to get Steem-Engine balances for {coin.symbol} ({sec.symbol})')
-    else:  # btcp
-        pass
+        log.exception(f'unable to get balance/supply for {coin.symbol} {coin.our_account}')
     return balances
+
+
+@r_cache(lambda coin, network: f'feecalc:supply:{network}:{coin.symbol}', cache_time=3600*6)
+def get_coin_supply(coin, network):
+    token_info = SteemEngineToken(network=network).get_token(coin.symbol)
+    return coin.symbol + ' sup', -Decimal(token_info['circulating_supply'])
+
+
+@r_cache(lambda coin, network=None: f'feecalc:balance:{network}:{coin}', cache_time=3600*6)
+def get_coin_balance(coin, network=None):
+    if coin.our_account is None:
+        return 'RPC bal', Decimal(get_manager(coin.symbol).rpc.getbalance())
+    elif network:
+        return coin.symbol + ' bal', Decimal(SteemEngineToken(network=network).get_token_balance(coin.our_account, coin.symbol))
+    else:
+        return coin.symbol + ' bal', Decimal(get_manager(coin.symbol).balance(coin.our_account))
 
 
 def get_price(coin: str):
@@ -142,12 +192,6 @@ def get_coinmarketcap_data():
         log.error('Unable to get CMC Listings')
 
 
-class FeePayoutAdmin(admin.ModelAdmin):
-    list_display = ('coin', 'amount', 'created_at')
-    list_filter = ('coin', 'created_at')
-    ordering = ('created_at', 'updated_at')
-
-
 def get_native_coin(k):
     if 'SWAP.' in k:
         native_coin = k[5:]
@@ -164,8 +208,9 @@ def get_unused(payout):
     unused = {coin_id: dict(unused=0, decimals=v['decimals'], balances=[]) for coin_id, v in payout if
               not (coin_id.startswith('SWAP.') or coin_id.endswith('P'))}
     for k, v in payout:
-        unused[get_native_coin(k)]['balances'].extend(v['balances'])
-        unused[get_native_coin(k)]['unused'] += sum([bal[1] for bal in v['balances']])
+        if k == get_native_coin(k):
+            unused[k]['balances'] = v['balances']
+            unused[k]['unused'] += sum([bal[1] for bal in v['balances'] if bal])
     return unused
 
 
@@ -246,3 +291,10 @@ class FeePayoutView(TemplateView):
             if p.get('privex_cut', 0):
                 FeePayout(coin_id=coin, amount=p['privex_cut'], notes='privex').save()
         return redirect('admin:fee_payout')
+
+
+class FeePayoutAdmin(admin.ModelAdmin):
+    list_display = ('coin', 'amount', 'notes', 'created_at')
+    list_filter = ('coin', 'created_at')
+    ordering = ('created_at', 'updated_at')
+    actions = [send_payout]
