@@ -41,7 +41,7 @@ def mk_heng_rpc() -> SteemEngineToken:
                 port_num = int(node_parts[1])
 
         rpc_url = '/contracts'
-        if use_ssl:
+        if use_ssl and (rpc_node == 'api2.hive-engine.com' or rpc_node == 'api.hive-engine.com'):
             rpc_url = '/rpc/contracts'
         history_node = 'history.hive-engine.com'
         history_url = 'accountHistory'

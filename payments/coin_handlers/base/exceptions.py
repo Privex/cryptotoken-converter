@@ -44,3 +44,7 @@ class MissingTokenMetadata(CoinHandlerException):
     such as :py:attr:`payments.models.Coin.our_account` or a required key in the custom JSON settings.
     """
     pass
+
+class BlockWaitTimeExceeded(CoinHandlerException):
+    """Took too long to fetch a block while verifying transaction send on the underlying Steem or Hive blockchain."""
+    pass

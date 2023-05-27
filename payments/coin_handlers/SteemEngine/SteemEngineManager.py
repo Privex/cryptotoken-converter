@@ -18,7 +18,7 @@
 import logging
 import privex.steemengine.exceptions as SENG
 from typing import List, Tuple
-from beem.exceptions import MissingKeyError
+from beem.exceptions import MissingKeyError, BlockWaitTimeExceeded
 from decimal import Decimal, getcontext, ROUND_DOWN
 
 from payments.coin_handlers.SteemEngine.SteemEngineMixin import SteemEngineMixin
@@ -250,6 +250,8 @@ class SteemEngineManager(BaseManager, SteemEngineMixin):
                     }
                 except MissingKeyError:
                     raise
+                except BlockWaitTimeExceeded:
+                    raise
                 except:
                     num_retries += 1
                     if num_retries >= 5:
@@ -258,6 +260,8 @@ class SteemEngineManager(BaseManager, SteemEngineMixin):
             raise exceptions.AccountNotFound(str(e))
         except MissingKeyError:
             raise exceptions.IssuerKeyError('Missing active key for issuer account {}'.format(issuer))
+        except BlockWaitTimeExceeded as e:
+            raise exceptions.BlockWaitTimeExceeded(str(e))
 
     def send(self, amount, address, memo=None, from_address=None, trigger_data=None) -> dict:
         """
@@ -330,6 +334,8 @@ class SteemEngineManager(BaseManager, SteemEngineMixin):
                     raise
                 except MissingKeyError:
                     raise
+                except BlockWaitTimeExceeded:
+                    raise
                 except:
                     num_retries += 1
                     if num_retries >= 5:
@@ -342,6 +348,8 @@ class SteemEngineManager(BaseManager, SteemEngineMixin):
             raise exceptions.NotEnoughBalance(str(e))
         except MissingKeyError:
             raise exceptions.AuthorityMissing('Missing active key for sending account {}'.format(from_address))
+        except BlockWaitTimeExceeded as e:
+            raise exceptions.BlockWaitTimeExceeded(str(e))
 
     def send_or_issue(self, amount, address, memo=None, trigger_data=None) -> dict:
         try:

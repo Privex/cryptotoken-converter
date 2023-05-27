@@ -29,7 +29,7 @@ from privex.helpers import is_true
 
 from payments.coin_handlers import get_manager
 from payments.coin_handlers.base import SettingsMixin
-from payments.coin_handlers.base.exceptions import NotEnoughBalance, AccountNotFound
+from payments.coin_handlers.base.exceptions import NotEnoughBalance, AccountNotFound, BlockWaitTimeExceeded
 from payments.management import CronLoggerMixin
 from payments.models import Deposit, Coin, CoinPair, Conversion, AddressAccountMap
 from steemengine.helpers import empty
@@ -247,6 +247,8 @@ class ConvertCore:
             return c
         except AccountNotFound:
             raise ConvertInvalid('Destination address "{}" appears to be invalid. Exc: AccountNotFound'.format(address))
+        except BlockWaitTimeExceeded:
+            raise ConvertError("Timeout while trying to verify send or issue transaction. Be aware the transaction may still have succeeded and double check before retrying!")
         except NotEnoughBalance:
             log.error('Not enough balance to send %f %s. Will try again later...', send_amount, dest_coin)
             try:

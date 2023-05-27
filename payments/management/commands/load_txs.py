@@ -70,7 +70,9 @@ class Command(CronLoggerMixin, BaseCommand):
     def make_he_url(self, node_num: int) -> str:
         base_url = settings.HE_RPC_NODES[node_num] + '/';
         if base_url[:8] == 'https://':
-            base_url = base_url + 'rpc/'
+            node_domain = base_url[8:]
+            if node_domain == 'api2.hive-engine.com/' or node_domain == 'api.hive-engine.com/':
+                base_url = base_url + 'rpc/'
         return base_url
 
     def call_he_api(self, post_data: dict, dest_type: str) -> dict:
