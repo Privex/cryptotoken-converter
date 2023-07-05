@@ -38,8 +38,8 @@ def confirm_send_payout(modeladmin, request, queryset: QuerySet):
         payouts.append(d)
 
     if len(payouts) < 1:
-        add_message(request, messages.ERROR, 'No valid cancellable services selected.')
-        return redirect('/pvx_admin/billing/service/')
+        add_message(request, messages.ERROR, 'No unpaid payouts selected.')
+        return redirect('/admin/fees/feepayout/')
 
     return TemplateResponse(request, "admin/confirm_send_payout.html", {
         'payouts': payouts,
@@ -50,6 +50,9 @@ def confirm_send_payout(modeladmin, request, queryset: QuerySet):
     })
 
 
+confirm_send_payout.short_description = 'Send Payout'
+
+
 def send_payout(request):
     rp = request.POST
     objlist = rp.getlist('objects[]')
@@ -58,7 +61,7 @@ def send_payout(request):
             request, messages.ERROR,
             'No payouts selected.'
         )
-        redirect(request.build_absolute_uri())
+        redirect('/admin/fees/feepayout/')
     password = rp.get('password')
     if password != env('FEE_PAYOUT_PASS'):
         raise Exception('Invalid password supplied to send payout')
@@ -100,17 +103,21 @@ def send_payout(request):
                 add_message(request, messages.ERROR, f'Unable to read notes during payout: {d} {d.notes}')
                 continue
             if type(address) is tuple:
-                get_manager(d.coin.symbol_id).send(d.amount, address=address[0], memo=address[1])
+                #get_manager(d.coin.symbol_id).send(d.amount, address=address[0], memo=address[1])
                 add_message(request, messages.INFO, f"Sent {d.amount} {d.coin.symbol} to {address[0]}, memo: {address[1]}")
+                d.paid = True
+                d.save()
             elif address:
-                get_manager(d.coin.symbol_id).send(d.amount, address=address)
+                #get_manager(d.coin.symbol_id).send(d.amount, address=address)
                 add_message(request, messages.INFO, f"Sent {d.amount} {d.coin.symbol} to {address}")
+                d.paid = True
+                d.save()
             else:
                 add_message(request, messages.ERROR, f"Unable to transfer {d.coin.symbol}, no address for {d.notes}")
         except Exception as e:
             log.exception(f'Error while paying out {d}')
             add_message(request, messages.ERROR, f"Unable to pay out: {d} ({str(e)})")
-    return redirect(request.build_absolute_uri())
+    return redirect('/admin/fees/feepayout/')
 
 
 def get_payout(since='1970-01-01', sort=True):
