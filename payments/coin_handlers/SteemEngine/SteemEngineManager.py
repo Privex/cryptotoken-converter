@@ -253,9 +253,11 @@ class SteemEngineManager(BaseManager, SteemEngineMixin):
                 except BlockWaitTimeExceeded:
                     raise
                 except:
-                    num_retries += 1
-                    if num_retries >= 5:
-                        raise
+                    log.info('unhandled exception; aborting')
+                    raise
+                    #num_retries += 1
+                    #if num_retries >= 5:
+                    #    raise
         except SENG.AccountNotFound as e:
             raise exceptions.AccountNotFound(str(e))
         except MissingKeyError:
@@ -337,9 +339,11 @@ class SteemEngineManager(BaseManager, SteemEngineMixin):
                 except BlockWaitTimeExceeded:
                     raise
                 except:
-                    num_retries += 1
-                    if num_retries >= 5:
-                        raise
+                    log.info('unhandled exception; aborting')
+                    raise
+                    #num_retries += 1
+                    #if num_retries >= 5:
+                    #    raise
         except SENG.AccountNotFound as e:
             raise exceptions.AccountNotFound(str(e))
         except SENG.TokenNotFound as e:
