@@ -12,6 +12,7 @@ from django.db.models.query import QuerySet
 from django.shortcuts import redirect
 from django.template.response import TemplateResponse
 from django.views.generic.base import TemplateView
+from getenv import env
 from privex.helpers import DictObject, r_cache
 from requests import Session, Timeout, TooManyRedirects
 
@@ -24,13 +25,43 @@ from payments.models import Conversion, Coin
 log = logging.getLogger(__name__)
 
 
-def send_payout(modeladmin, request, queryset: QuerySet):
-    if len(queryset) < 1:
+def confirm_send_payout(modeladmin, request, queryset: QuerySet):
+    """
+    Confirmation page for the "Suspend Services" page.
+    """
+    rp = request.POST
+    payouts = []
+    for d in queryset:  # type: FeePayout
+        if d.paid:
+            add_message(request, messages.ERROR, f'Cannot pay out ({d}) - already paid')
+            continue
+        payouts.append(d)
+
+    if len(payouts) < 1:
+        add_message(request, messages.ERROR, 'No valid cancellable services selected.')
+        return redirect('/pvx_admin/billing/service/')
+
+    return TemplateResponse(request, "admin/confirm_send_payout.html", {
+        'payouts': payouts,
+        'action': rp.get('action', ''),
+        'select_across': rp.get('select_across', ''),
+        'index': rp.get('index', ''),
+        'selected_action': rp.get('_selected_action', ''),
+    })
+
+
+def send_payout(request):
+    rp = request.POST
+    objlist = rp.getlist('objects[]')
+    if len(objlist) < 1:
         add_message(
             request, messages.ERROR,
             'No payouts selected.'
         )
         redirect(request.build_absolute_uri())
+    password = rp.get('password')
+    if password != env('FEE_PAYOUT_PASS'):
+        raise Exception('Invalid password supplied to send payout')
     privex_wallets = {
         'BTC': 'bc1q2wjjd0fqqhf5uzy43kqyf5vsm37st8q8zuj8r4lyav3zyvvh3ytql736tu',
         'LTC': 'LWY6hPyHP98NdZMXFKn7EvmptQnUnsNvWv',
@@ -39,7 +70,8 @@ def send_payout(modeladmin, request, queryset: QuerySet):
         'HBD': 'privex',
         'DOGE': 'DAeWUsC1Kr8R1EES8XnzLJvtfAN9iLjhZu',
         'WAX': 'privexinceos',
-        'BLURT': 'privex'
+        'BLURT': ('blurt-swap', 'SWAP.BLURT privex'),
+        'STEEM': 'privex'
     }
     he_wallets = {
         'BTC': 'bc1q324jejrpmyd23ejflhrluemsatuxa3ghuk5w3m',
@@ -50,8 +82,9 @@ def send_payout(modeladmin, request, queryset: QuerySet):
         'DOGE': 'D695r3CS7LM8CJSRFMRcyGFxxww1wEy9gY',
         'WAX': '',
         'BLURT': ('blurt-swap', 'SWAP.BLURT hive-engine'),
+        'STEEM': 'hive-engine'
     }
-    for d in queryset:  # type: FeePayout
+    for d in FeePayout.objects.filter(id__in=objlist):  # type: FeePayout
         try:
             if d.notes == 'privex':
                 if d.coin.symbol.startswith('SWAP.'):
@@ -67,14 +100,16 @@ def send_payout(modeladmin, request, queryset: QuerySet):
                 add_message(request, messages.ERROR, f'Unable to read notes during payout: {d} {d.notes}')
                 continue
             if type(address) is tuple:
+                get_manager(d.coin.symbol_id).send(d.amount, address=address[0], memo=address[1])
                 add_message(request, messages.INFO, f"Sent {d.amount} {d.coin.symbol} to {address[0]}, memo: {address[1]}")
-                #get_manager(d.coin.symbol_id).send(d.amount, address=address[0], memo=address[1])
             elif address:
-                add_message(request, messages.INFO, f"Sent {d.amount} {d.coin.symbol} to {address[0]}")
-                #get_manager(d.coin.symbol_id).send(d.amount, address=address)
+                get_manager(d.coin.symbol_id).send(d.amount, address=address)
+                add_message(request, messages.INFO, f"Sent {d.amount} {d.coin.symbol} to {address}")
+            else:
+                add_message(request, messages.ERROR, f"Unable to transfer {d.coin.symbol}, no address for {d.notes}")
         except Exception as e:
             log.exception(f'Error while paying out {d}')
-            add_message(request, messages.ERROR, f"Unable to pay out: {d}")
+            add_message(request, messages.ERROR, f"Unable to pay out: {d} ({str(e)})")
     return redirect(request.build_absolute_uri())
 
 
@@ -297,4 +332,4 @@ class FeePayoutAdmin(admin.ModelAdmin):
     list_display = ('coin', 'amount', 'notes', 'created_at')
     list_filter = ('coin', 'created_at')
     ordering = ('created_at', 'updated_at')
-    actions = [send_payout]
+    actions = [confirm_send_payout]

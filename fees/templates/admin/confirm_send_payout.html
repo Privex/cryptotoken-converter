@@ -1,0 +1,42 @@
+{% extends "admin/base_site.html" %}
+{% load i18n cache static l10n %}
+
+{% block extrastyle %}
+    {{ block.super }}
+    <link rel="stylesheet" type="text/css" href="{% static "admin/css/forms.css" %}">
+{% endblock %}
+
+{% block breadcrumbs %}
+    <div class="breadcrumbs">
+        <a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
+        &rsaquo; <a
+            href="">Send Fee Payout</a>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <h1>Fee Payout</h1>
+
+    <form method="POST" action="{% url 'admin:post_send_payout' %}" id="send-payout-form">
+        {% csrf_token %}
+        <ul>
+            {% for obj in payouts %}
+                <li>Payout ID: {{ obj.id }} | Coin: {{ obj.coin }} | Amount: {{ obj.amount }} |
+                    Notes: {{ obj.notes }} | Created At: {{ obj.created_at }}
+                </li>
+                <input type="hidden" name="objects[]" value="{{ obj.pk }}"/>
+            {% endfor %}
+        </ul>
+        <input type="hidden" name="action" value="{{ action }}"/>
+        <input type="hidden" name="select_across" value="{{ select_across }}"/>
+        <input type="hidden" name="index" value="{{ index }}"/>
+
+        <p>Password:
+            <label for="password">Password:<input type="text" id="password" name="password"/></label>
+        </p>
+
+        <div class="submit-row" style="text-align: left">
+            <input type="submit" name="submitbtn" value="Send Payout" id="send-button"/>
+        </div>
+    </form>
+{% endblock %}
