@@ -103,12 +103,12 @@ def send_payout(request):
                 add_message(request, messages.ERROR, f'Unable to read notes during payout: {d} {d.notes}')
                 continue
             if type(address) is tuple:
-                #get_manager(d.coin.symbol_id).send(d.amount, address=address[0], memo=address[1])
+                get_manager(d.coin.symbol_id).send(d.amount, address=address[0], memo=address[1])
                 add_message(request, messages.INFO, f"Sent {d.amount} {d.coin.symbol} to {address[0]}, memo: {address[1]}")
                 d.paid = True
                 d.save()
             elif address:
-                #get_manager(d.coin.symbol_id).send(d.amount, address=address)
+                get_manager(d.coin.symbol_id).send(d.amount, address=address)
                 add_message(request, messages.INFO, f"Sent {d.amount} {d.coin.symbol} to {address}")
                 d.paid = True
                 d.save()
