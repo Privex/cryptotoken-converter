@@ -66,7 +66,7 @@ class SteemLoader(BaseLoader, SteemMixin):
 
     def __init__(self, symbols):
         super(SteemLoader, self).__init__(symbols=symbols)
-        self.tx_count = 100
+        self.tx_count = 20
         self.loaded = False
         self._rpc = None
         self._rpcs = {}
@@ -76,7 +76,7 @@ class SteemLoader(BaseLoader, SteemMixin):
         """To ensure we always get fresh settings from the DB after a reload"""
         return dict(((sym, c.settings) for sym, c in self.coins.items()))
 
-    def load(self, tx_count=100):
+    def load(self, tx_count=20):
         # Unlike other coins, it's important to load a lot of TXs, because many won't actually be transfers
         # Thus the default TX count for Steem is 10,000
         self.tx_count = tx_count
