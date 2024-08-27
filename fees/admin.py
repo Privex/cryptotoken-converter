@@ -73,7 +73,7 @@ def send_payout(request):
         'HBD': 'privex',
         'DOGE': 'DAeWUsC1Kr8R1EES8XnzLJvtfAN9iLjhZu',
         'WAX': 'privexinceos',
-        'BLURT': ('blurt-swap', 'SWAP.BLURT privex'),
+        'BLURT': 'privex',
         'STEEM': 'privex'
     }
     he_wallets = {
@@ -84,7 +84,7 @@ def send_payout(request):
         'HBD': 'hive-engine',
         'DOGE': 'D695r3CS7LM8CJSRFMRcyGFxxww1wEy9gY',
         'WAX': '',
-        'BLURT': ('blurt-swap', 'SWAP.BLURT hive-engine'),
+        'BLURT': 'hive-engine',
         'STEEM': 'hive-engine'
     }
     for d in FeePayout.objects.filter(id__in=objlist):  # type: FeePayout
@@ -168,11 +168,11 @@ def get_payout(since='1970-01-01', sort=True):
 
 def get_coin_balances(coin):
     he = Coin.objects.filter(symbol='SWAP.' + get_native_coin(coin.symbol))
-    se = Coin.objects.using('steemengine').filter(symbol=get_native_coin(coin.symbol) + 'P', coin_type='steemengine')
+    #se = Coin.objects.using('steemengine').filter(symbol=get_native_coin(coin.symbol) + 'P', coin_type='steemengine')
     balances = [get_coin_balance(coin)]
     try:
         balances += [get_coin_balance(hec, 'hive') for hec in he] + [get_coin_supply(hec, 'hive') for hec in he]
-        balances += [get_coin_balance(sec, 'steem') for sec in se] + [get_coin_supply(sec, 'steem') for sec in se]
+        #balances += [get_coin_balance(sec, 'steem') for sec in se] + [get_coin_supply(sec, 'steem') for sec in se]
     except Exception:
         log.exception(f'unable to get balance/supply for {coin.symbol} {coin.our_account}')
     return balances
@@ -188,8 +188,9 @@ def get_coin_supply(coin, network):
 def get_coin_balance(coin, network=None):
     if coin.our_account is None:
         return 'RPC bal', Decimal(get_manager(coin.symbol).rpc.getbalance())
-    elif network:
-        return coin.symbol + ' bal', Decimal(SteemEngineToken(network=network).get_token_balance(coin.our_account, coin.symbol))
+    elif network == 'steem':
+        #return coin.symbol + ' bal', Decimal(SteemEngineToken(network=network).get_token_balance(coin.our_account, coin.symbol))
+        return coin.symbol + ' steem n/a', Decimal(0)
     else:
         return coin.symbol + ' bal', Decimal(get_manager(coin.symbol).balance(coin.our_account))
 
@@ -268,7 +269,7 @@ def get_payout_table():
             total_fees=pr['amount'],
         )
     for coin, pr in payout_table.items():
-        if not pr['native']:
+        if not pr['native'] and get_native_coin(coin) in payout_table:
             payout_table[get_native_coin(coin)]['total_fees'] += pr['fee_amount']
     privex_share = Decimal(0.25)
     he_share = Decimal(0.75)
@@ -285,6 +286,8 @@ def get_payout_table():
             except Coin.DoesNotExist:
                 pass
         else:
+            if get_native_coin(coin) not in payout_table:
+                continue
             pr['value'] = ''
             try:
                 swap_coin = Coin.objects.get(symbol_id=coin)
