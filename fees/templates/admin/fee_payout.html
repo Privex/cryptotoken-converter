@@ -22,12 +22,12 @@
             {% for coin_id, p in payout %}<tr>
                 <td>{{ coin_id }}</td>
                 <td>{{ p.fees|floatformat:p.decimals }}</td>
-                <td>{{ p.amount|floatformat:p.decimals }}</td>
                 {% for coin_id2, u in unused.items %}
                     {% if coin_id2 == coin_id %}
                 <td>{{ u.unused|floatformat:u.decimals }}</td>
                     {% endif %}
                 {% endfor %}
+                <td>{{ p.amount|floatformat:p.decimals }}</td>
                 <td>${{ p.value }}</td>
             </tr>{% endfor %}
         </table>
