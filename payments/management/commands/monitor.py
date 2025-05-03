@@ -44,20 +44,21 @@ def checkAndProcess(plist, logline):
         if 'hiveeng+' in token:
             next_is_pid = True
         elif next_is_pid == True:
-            next_is_pid = False
-            pid = token
-            running_time = subprocess.run(['ps -p %s -o etimes' % pid], shell=True, capture_output=True, text=True).stdout
-            rtime_array = running_time.split('ELAPSED')
-            if len(rtime_array) >= 2:
-                time_string = rtime_array[1].strip(' \n')
-                if len(time_string) > 0:
-                    seconds = int(time_string)
-                    log.info('pid %s has been running for %s seconds' % (pid, seconds))
-                    if (seconds > stuck_threshold):
-                        log.info('killing pid %s' % pid)
-                        err_result = subprocess.run(['kill %s' % pid], shell=True, capture_output=True, text=True).stderr
-                        if (len(err_result) > 0):
-                            log.info(err_result)
+            pid = token.strip()
+            if pid.isnumeric() and len(pid) > 0:
+                running_time = subprocess.run(['ps -p %s -o etimes' % pid], shell=True, capture_output=True, text=True).stdout
+                rtime_array = running_time.split('ELAPSED')
+                next_is_pid = False
+                if len(rtime_array) >= 2:
+                    time_string = rtime_array[1].strip(' \n')
+                    if len(time_string) > 0:
+                        seconds = int(time_string)
+                        log.info('pid %s has been running for %s seconds' % (pid, seconds))
+                        if (seconds > stuck_threshold):
+                            log.info('killing pid %s' % pid)
+                            err_result = subprocess.run(['kill %s' % pid], shell=True, capture_output=True, text=True).stderr
+                            if (len(err_result) > 0):
+                                log.info(err_result)
 
 
 class Command(CronLoggerMixin, BaseCommand):
