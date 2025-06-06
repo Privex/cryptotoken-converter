@@ -181,7 +181,11 @@ def get_payout(since='1970-01-01', sort=True, by_native=True):
         summary[coin_id]['decimals'] = 4 if 'BTC' in coin_id else 2
         summary[coin_id]['amount'] = sum(summary[coin_id]['amounts'].values())
         summary[coin_id]['value'] = f"{summary[coin_id]['rate'] * Decimal(summary[coin_id]['amount']):.2f}"
-        summary[coin_id]['balances'] = get_coin_balances(summary[coin_id]['coin'])
+        try:
+            summary[coin_id]['balances'] = get_coin_balances(summary[coin_id]['coin'])
+        except UnboundLocalError:
+            summary[coin_id]['error'] = True
+            summary[coin_id]['balances'] = []
     if sort:
         return sorted(summary.items(), key=lambda i: Decimal(i[1]['value']), reverse=True)
     else:
@@ -308,17 +312,17 @@ def get_payout_table():
         if pr['native']:
             pr['value'] = pr['total_fees'] * pr['price']
             pr['privex_cut'] = pr['total_fees'] * privex_share
-            try:
-                swap_coin = Coin.objects.get(symbol_id='SWAP.' + coin)
-                try:
-                    balance = Decimal(get_manager(swap_coin.symbol_id).balance(swap_coin.our_account))
-                except KeyError:
-                    balance = Decimal(0)
-                pr['he_cut'] = max(pr['total_fees'] * he_share - balance, 0)
-                if pr['he_cut'] == 0:
-                    del pr['he_cut']
-            except Coin.DoesNotExist:
-                pass
+            #try:
+                #swap_coin = Coin.objects.get(symbol_id='SWAP.' + coin)
+                #try:
+                #    balance = Decimal(get_manager(swap_coin.symbol_id).balance(swap_coin.our_account))
+                #except KeyError:
+                #    balance = Decimal(0)
+            #    pr['he_cut'] = pr['total_fees'] * he_share
+            #    if pr['he_cut'] == 0:
+            #        del pr['he_cut']
+            #except Coin.DoesNotExist:
+            #    pass
         else:
             if get_native_coin(coin) not in payout_table:
                 continue
@@ -329,7 +333,7 @@ def get_payout_table():
                     pr['he_balance'] = Decimal(get_manager(swap_coin.symbol_id).balance(swap_coin.our_account))
                 except KeyError:
                     pr['he_balance'] = Decimal(0)
-                pr['he_cut'] = min(payout_table[get_native_coin(coin)]['total_fees'] * he_share, pr['he_balance'])
+                pr['he_cut'] = payout_table[get_native_coin(coin)]['total_fees'] * he_share
             except Coin.DoesNotExist:
                 pass
             pr['total_fees'] = ''
