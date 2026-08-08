@@ -505,5 +505,6 @@ class FeePayoutView(TemplateView):
 class FeePayoutAdmin(admin.ModelAdmin):
     list_display = ('coin', 'amount', 'notes', 'paid', 'created_at')
     list_filter = ('coin', 'created_at', 'paid')
+    search_fields = ('notes', 'coin__symbol')
     ordering = ('-created_at', '-updated_at')
     actions = [confirm_send_payout, export_fee_payments_csv]
