@@ -1,3 +1,4 @@
+import csv
 import json
 import logging
 from decimal import Decimal
@@ -9,6 +10,7 @@ from django.core.exceptions import PermissionDenied
 from django.db.models import Q
 from django.db.models.aggregates import Sum
 from django.db.models.query import QuerySet
+from django.http import HttpResponse
 from django.shortcuts import redirect
 from django.template.response import TemplateResponse
 from django.views.generic.base import TemplateView
@@ -23,6 +25,8 @@ from privex.steemengine.exceptions import NoResults
 from payments.models import Conversion, Coin
 
 log = logging.getLogger(__name__)
+
+CMC_API_KEY = '2b653ab6-2fe2-4ff5-8536-88666fce9e1d'
 
 
 privex_wallets = {
@@ -75,6 +79,40 @@ def confirm_send_payout(modeladmin, request, queryset: QuerySet):
 
 
 confirm_send_payout.short_description = 'Send Payout'
+
+
+def export_fee_payments_csv(modeladmin, request, queryset: QuerySet):
+    """Export selected fee payouts as CSV with base-asset USD price/value at payout time."""
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="fee_payments.csv"'
+    writer = csv.writer(response)
+    writer.writerow([
+        'id', 'coin', 'base_asset', 'amount', 'notes', 'paid', 'created_at',
+        'base_price_usd', 'dollar_value',
+    ])
+    for payout in queryset.select_related('coin').order_by('created_at', 'id'):
+        base_asset = get_native_coin(payout.coin.symbol)
+        price = get_historical_price(base_asset, payout.created_at)
+        if price:
+            value = (Decimal(payout.amount) * price).quantize(Decimal('0.01'))
+        else:
+            price = Decimal(0)
+            value = None
+        writer.writerow([
+            payout.id,
+            payout.coin.symbol,
+            base_asset,
+            payout.amount,
+            payout.notes,
+            payout.paid,
+            payout.created_at.isoformat(sep=' ', timespec='seconds'),
+            price,
+            value,
+        ])
+    return response
+
+
+export_fee_payments_csv.short_description = 'Export selected fee payments as CSV'
 
 
 def send_payout(request):
@@ -242,6 +280,91 @@ def get_price(coin: str):
         return Decimal(0)
 
 
+def get_historical_price(coin: str, when):
+    """USD price for ``coin`` on the UTC date of ``when``. Returns 0 if the API call fails."""
+    if coin == 'SAND':
+        return Decimal(0.000851225622)
+    if coin == 'WAX':
+        coin = 'WAXP'
+    day = when.strftime('%Y-%m-%d') if hasattr(when, 'strftime') else str(when)[:10]
+    return _get_historical_price(coin, day) or Decimal(0)
+
+
+def _cmc_session():
+    session = Session()
+    session.headers.update({
+        'Accepts': 'application/json',
+        'X-CMC_PRO_API_KEY': CMC_API_KEY,
+    })
+    return session
+
+
+@r_cache(lambda coin: f'cmc_id:{coin}', cache_time=3600 * 24 * 7)
+def get_cmc_id(coin: str):
+    """Resolve a ticker to the best-matching CoinMarketCap asset id."""
+    if coin == 'WAX':
+        coin = 'WAXP'
+    try:
+        response = _cmc_session().get(
+            'https://pro-api.coinmarketcap.com/v1/cryptocurrency/map',
+            params={'symbol': coin},
+        )
+        payload = json.loads(response.text)
+        matches = [
+            item for item in (payload.get('data') or [])
+            if item.get('symbol') == coin
+        ]
+        if not matches:
+            log.warning('No CMC id for %s: %s', coin, payload.get('status'))
+            return None
+        matches.sort(key=lambda item: (
+            0 if item.get('is_active') else 1,
+            item.get('rank') if item.get('rank') is not None else 999999,
+            item['id'],
+        ))
+        return matches[0]['id']
+    except (ConnectionError, Timeout, TooManyRedirects, KeyError, TypeError, ValueError) as e:
+        log.error('Unable to resolve CMC id for %s: %s', coin, e)
+        return None
+
+
+@r_cache(lambda coin, day: f'cmc_hist_v2:{coin}:{day}', cache_time=3600 * 24 * 30)
+def _get_historical_price(coin: str, day: str):
+    cmc_id = get_cmc_id(coin)
+    if not cmc_id:
+        return Decimal(0)
+    url = 'https://pro-api.coinmarketcap.com/v2/cryptocurrency/quotes/historical'
+    parameters = {
+        'id': str(cmc_id),
+        'time_end': f'{day}T23:59:00.000Z',
+        'count': '1',
+        'interval': 'daily',
+        'convert': 'USD',
+    }
+    try:
+        response = _cmc_session().get(url, params=parameters)
+        payload = json.loads(response.text)
+        status = payload.get('status') or {}
+        if status.get('error_code'):
+            log.warning(
+                'CMC historical error for %s (%s) on %s: %s',
+                coin, cmc_id, day, status.get('error_message'),
+            )
+            return Decimal(0)
+        data = payload.get('data') or {}
+        # v2 returns a single asset object; tolerate id-keyed shapes too
+        if isinstance(data, dict) and 'quotes' not in data:
+            data = data.get(str(cmc_id)) or data.get(cmc_id) or {}
+        quotes = (data or {}).get('quotes') or []
+        if not quotes:
+            log.warning('No CMC historical quotes for %s (%s) on %s', coin, cmc_id, day)
+            return Decimal(0)
+        return Decimal(str(quotes[-1]['quote']['USD']['price']))
+    except (ConnectionError, Timeout, TooManyRedirects, KeyError, TypeError, ValueError) as e:
+        log.error('Unable to get CMC historical price for %s on %s: %s', coin, day, e)
+        return Decimal(0)
+
+
 @r_cache('cmc_data', cache_time=3600*24)
 def get_coinmarketcap_data():
     url = 'https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest'
@@ -252,7 +375,7 @@ def get_coinmarketcap_data():
     }
     headers = {
         'Accepts': 'application/json',
-        'X-CMC_PRO_API_KEY': '2b653ab6-2fe2-4ff5-8536-88666fce9e1d',
+        'X-CMC_PRO_API_KEY': CMC_API_KEY,
     }
 
     session = Session()
@@ -383,4 +506,4 @@ class FeePayoutAdmin(admin.ModelAdmin):
     list_display = ('coin', 'amount', 'notes', 'paid', 'created_at')
     list_filter = ('coin', 'created_at', 'paid')
     ordering = ('-created_at', '-updated_at')
-    actions = [confirm_send_payout]
+    actions = [confirm_send_payout, export_fee_payments_csv]
