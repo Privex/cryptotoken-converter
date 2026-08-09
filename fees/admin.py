@@ -195,8 +195,7 @@ def get_payout(since='1970-01-01', sort=True, by_native=True):
                 coin = co.get(symbol=ncoin_id)
             except Coin.DoesNotExist:
                 continue
-        if not coin.enabled:
-            continue
+        # Disabled coins still count toward fee totals; payouts filter them out later.
         # collect info
         if coin_id in summary:
             if payout['amount'] > 0:
@@ -219,8 +218,12 @@ def get_payout(since='1970-01-01', sort=True, by_native=True):
         summary[coin_id]['decimals'] = 4 if 'BTC' in coin_id else 2
         summary[coin_id]['amount'] = sum(summary[coin_id]['amounts'].values())
         summary[coin_id]['value'] = f"{summary[coin_id]['rate'] * Decimal(summary[coin_id]['amount']):.2f}"
+        coin = summary[coin_id]['coin']
+        if not coin.enabled:
+            summary[coin_id]['balances'] = []
+            continue
         try:
-            summary[coin_id]['balances'] = get_coin_balances(summary[coin_id]['coin'])
+            summary[coin_id]['balances'] = get_coin_balances(coin)
         except UnboundLocalError:
             summary[coin_id]['error'] = True
             summary[coin_id]['balances'] = []
@@ -231,7 +234,7 @@ def get_payout(since='1970-01-01', sort=True, by_native=True):
 
 
 def get_coin_balances(coin):
-    he = Coin.objects.filter(symbol='SWAP.' + get_native_coin(coin.symbol))
+    he = Coin.objects.filter(symbol='SWAP.' + get_native_coin(coin.symbol), enabled=True)
     #se = Coin.objects.using('steemengine').filter(symbol=get_native_coin(coin.symbol) + 'P', coin_type='steemengine')
     try:
         balances = [get_coin_balance(coin)]
@@ -250,6 +253,8 @@ def get_coin_supply(coin, network):
 
 @r_cache(lambda coin, network=None: f'feecalc:balance:{network}:{coin}', cache_time=3600*6)
 def get_coin_balance(coin, network=None):
+    if not coin.enabled:
+        return coin.symbol + ' bal', Decimal(0)
     if coin.our_account is None:
         return 'RPC bal', Decimal(get_manager(coin.symbol).rpc.getbalance())
     elif network == 'steem':
@@ -417,6 +422,9 @@ def get_unused(payout):
 def get_payout_table():
     #payout = get_payout(FeePayout.objects.exclude(notes='aggroed').values('created_at').order_by('-created_at').first()['created_at'], sort=False)
     payout = get_payout('1970-01-01', sort=False, by_native=False)
+    # Upcoming payouts only include enabled coins. Disabled coins (e.g. BTCP) still appear
+    # in fee totals via get_payout(), but must not affect cuts or manager/balance calls.
+    payout = {coin: pr for coin, pr in payout.items() if pr['coin'].enabled}
     payout_table = {}
     for coin, pr in payout.items():
         payout_table[coin] = dict(
