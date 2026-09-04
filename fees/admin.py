@@ -149,24 +149,38 @@ def do_payout(d: FeePayout):
             if d.coin.symbol.startswith('SWAP.'):
                 address = 'aggroed'
             else:
-                return False, 'Unable to distribute non SWAP coin to aggroed'
+                msg = 'Unable to distribute non SWAP coin to aggroed'
+                d.last_error = msg
+                d.save(update_fields=['last_error', 'updated_at'])
+                return False, msg
         else:
-            return False, f'Unable to read notes during payout: {d} {d.notes}'
+            msg = f'Unable to read notes during payout: {d} {d.notes}'
+            d.last_error = msg
+            d.save(update_fields=['last_error', 'updated_at'])
+            return False, msg
         if type(address) is tuple:
             get_manager(d.coin.symbol_id).send(d.amount, address=address[0], memo=address[1])
             d.paid = True
+            d.last_error = ''
             d.save()
             return True, f"Sent {d.amount} {d.coin.symbol} to {address[0]}, memo: {address[1]}"
         elif address:
             get_manager(d.coin.symbol_id).send(d.amount, address=address)
             d.paid = True
+            d.last_error = ''
             d.save()
             return True, f"Sent {d.amount} {d.coin.symbol} to {address}"
         else:
-            return False, f"Unable to transfer {d.coin.symbol}, no address for {d.notes}"
+            msg = f"Unable to transfer {d.coin.symbol}, no address for {d.notes}"
+            d.last_error = msg
+            d.save(update_fields=['last_error', 'updated_at'])
+            return False, msg
     except Exception as e:
         log.exception(f'Error while paying out {d}')
-        return False, f"Unable to pay out: {d} ({str(e)} {e.__class__.__name__})"
+        msg = f"{e.__class__.__name__}: {e}"
+        d.last_error = msg
+        d.save(update_fields=['last_error', 'updated_at'])
+        return False, f"Unable to pay out: {d} ({msg})"
 
 
 def get_payout(since='1970-01-01', sort=True, by_native=True):
@@ -511,8 +525,8 @@ class FeePayoutView(TemplateView):
 
 
 class FeePayoutAdmin(admin.ModelAdmin):
-    list_display = ('coin', 'amount', 'notes', 'paid', 'created_at')
+    list_display = ('coin', 'amount', 'notes', 'paid', 'last_error', 'created_at')
     list_filter = ('coin', 'created_at', 'paid')
-    search_fields = ('notes', 'coin__symbol')
+    search_fields = ('notes', 'coin__symbol', 'last_error')
     ordering = ('-created_at', '-updated_at')
     actions = [confirm_send_payout, export_fee_payments_csv]
